@@ -188,6 +188,12 @@ http://localhost:5174
 
 ---
 
+## 🧾 Licencia
+
+Este proyecto se distribuye bajo la licencia MIT. Revisa el archivo `LICENSE` en la raíz del repositorio para más detalles.
+
+---
+
 ## 🏁 Estado del proyecto
 
 🟡 En desarrollo – Sprint inicial
