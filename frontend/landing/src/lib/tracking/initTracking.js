@@ -26,7 +26,10 @@ function initGA() {
     };
 
   window.gtag('js', new Date());
-  window.gtag('config', GA_MEASUREMENT_ID, { anonymize_ip: true });
+  window.gtag('config', GA_MEASUREMENT_ID, {
+    anonymize_ip: true,
+    send_page_view: false,
+  });
 
   gaInitialized = true;
 }
@@ -54,7 +57,6 @@ function initMetaPixel() {
   }
 
   window.fbq('init', META_PIXEL_ID);
-  window.fbq('track', 'PageView');
 
   metaInitialized = true;
 }
