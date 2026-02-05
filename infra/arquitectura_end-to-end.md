@@ -1,34 +1,49 @@
+
+```mermaid
 flowchart LR
-  %% ===== Users =====
-  U[Usuario / Cliente] --> L[Frontend Landing (Vercel)\nReact + Vite]
-  A[Operador / Admin] --> AD[Frontend Admin (Vercel)\nReact + Vite]
+  %% ===== Usuarios =====
+  U[Usuario / Cliente]
+  A[Operador / Admin]
 
-  %% ===== Tracking (client-side) =====
-  L -->|pageview / events| GA[Google Analytics 4]
-  L -->|pixel events| MP[Meta Pixel]
+  %% ===== Frontend =====
+  L[Landing\nReact + Vite\nVercel]
+  AD[Admin Dashboard\nReact + Vite\nVercel]
 
-  %% ===== Backend API =====
-  L -->|API calls| API[Backend API (Railway)\nSpring Boot]
+  %% ===== Backend =====
+  API[Backend API\nSpring Boot\nRailway]
+
+  %% ===== Pagos =====
+  ST[Stripe Checkout]
+
+  %% ===== Datos =====
+  DB[(PostgreSQL\nRailway)]
+
+  %% ===== Tracking =====
+  GA[Google Analytics 4]
+  MP[Meta Pixel]
+  CAPI[Meta CAPI]
+  GMP[GA4 Server-side]
+
+  %% ===== CRM =====
+  PD[Pipedrive CRM]
+
+  %% ===== Flujos =====
+  U --> L
+  A --> AD
+
+  L -->|API calls| API
   AD -->|API calls| API
 
-  %% ===== Payments =====
-  L -->|Checkout / Payment Link| ST[Stripe Checkout]
-  ST -->|Webhook: payment_intent.succeeded, checkout.session.completed| API
+  L -->|Checkout / Payment Link| ST
+  ST -->|Webhook: payment success| API
 
-  %% ===== Data =====
-  API --> DB[(PostgreSQL (Railway))]
-  API -->|Guardar transacción, customer, order| DB
-  AD <-->|Listar / filtrar / ver detalle| API
+  API -->|Guardar transacción| DB
+  AD <-->|Consultar datos| API
 
-  %% ===== Server-side tracking (recommended) =====
-  API -->|Conversion API event| CAPI[Meta CAPI]
-  API -->|GA4 Measurement Protocol| GMP[GA4 Server-side]
+  L -->|Eventos client-side| GA
+  L -->|Eventos client-side| MP
 
-  %% ===== CRM / Ops (optional) =====
-  API -->|Crear/Actualizar Deal| PD[Pipedrive CRM]
+  API -->|Eventos server-side| CAPI
+  API -->|Eventos server-side| GMP
 
-  %% ===== Notes =====
-  GA -.reporting.-> MK[Marketing / Ads Optimization]
-  MP -.attribution.-> MK
-  CAPI -.improves match quality.-> MK
-  GMP -.reduces ad blockers impact.-> MK
+  API -->|Crear / actualizar deal| PD
