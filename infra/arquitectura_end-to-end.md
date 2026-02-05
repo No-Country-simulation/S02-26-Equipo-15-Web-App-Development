@@ -1,4 +1,3 @@
-
 ```mermaid
 flowchart LR
   %% ===== Usuarios =====
