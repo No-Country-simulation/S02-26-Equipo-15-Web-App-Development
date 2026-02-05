@@ -1,43 +1,53 @@
 # Landing (React + Vite)
 
-Landing con tracking client-side listo para GA4 y Meta Pixel.
+Landing con tracking client-side para GA4 y Meta Pixel.
 
 ## Requisitos
 - Node 18+
 - npm 9+
 
-## Instalación y ejecución local
+## Instalacion y ejecucion local
 ```bash
 cd frontend/landing
 npm install
 npm run dev
 ```
-La app queda en http://localhost:5173.
+La app queda en `http://localhost:5173`.
 
 ## Variables de entorno
-Configura un `.env` (no se versiona) tomando como referencia `.env.example`:
+Crea un `.env` local desde `.env.example` (no se versiona en git):
+```bash
+cp .env.example .env
 ```
-VITE_STRIPE_PAYMENT_LINK=
-VITE_API_BASE=
-VITE_GA_MEASUREMENT_ID=
-VITE_META_PIXEL_ID=
+
+Valores esperados en `.env.example`:
+```env
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+VITE_META_PIXEL_ID=123456789012345
+VITE_API_BASE=http://localhost:8080
+VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/your_payment_link
 ```
-- Producción (Vercel): Project Settings → Environment Variables → añade las mismas claves para Production/Preview.
-- Local: copia `.env.example` a `.env` y completa los valores. Si no pones IDs de tracking, no se insertan scripts ni se envían eventos.
 
-## Tracking implementado
-- Inyección runtime de gtag.js y fbevents.js desde `src/lib/tracking/initTracking.js` (idempotente, solo si hay env vars).
-- API de eventos en `src/lib/tracking/events.js`:
-  - `trackPageView(path?)` → GA4 `page_view`, Meta `PageView`.
-  - `trackCTA({ eventId?, label? })` → GA4 `click_cta`, Meta `ClickCTA` (custom) con `event_id`/`eventID` para deduplicación futura con CAPI.
-  - `trackBeginCheckout({ value?, currency?, eventId? })` → GA4 `begin_checkout`, Meta `InitiateCheckout` con `event_id`/`eventID`.
-- El CTA principal dispara `trackCTA` + `trackBeginCheckout` antes de redirigir al checkout (valor por defecto USD 0).
+Si cambias valores de `.env`, reinicia `npm run dev` para que Vite recargue `import.meta.env`.
 
-## Cómo validar los eventos
-- **GA4**: en DebugView (o Realtime) revisa `page_view`, `click_cta`, `begin_checkout`. Usa Tag Assistant preview o `?debug_mode=1`.
-- **Meta Events Manager → Test Events**: ingresa el Pixel ID, abre la landing en la misma ventana y verifica `PageView`, `ClickCTA`, `InitiateCheckout` (con eventID cuando se envía).
+## Tracking (GA4 + Meta Pixel)
+- Inicializacion en `src/main.jsx`: `initTracking()` corre antes de `trackPageView()`.
+- `page_view` se envia manualmente desde `trackPageView()` (fuente unica para GA4 y Meta).
+- GA4 se inicializa con `send_page_view: false` para evitar auto `page_view`.
+- Meta Pixel se inicializa con `fbq('init', PIXEL_ID)` sin `fbq('track', 'PageView')` en init.
 
-## Notas de QA
-- Sin `VITE_GA_MEASUREMENT_ID` o `VITE_META_PIXEL_ID` no se cargan scripts ni se envían eventos (sin errores en consola).
-- No se implementa `Purchase` ni tracking server-side aquí; se hará por webhook/CAPI en el backend.
-- `.env`, `node_modules` y `dist` están ignorados por git.
+### Verificacion en navegador
+- DevTools -> Network: filtra `collect?v=2` para GA4.
+- DevTools -> Network: filtra `fbevents.js` y `tr?id=` para Meta Pixel.
+- DevTools -> Console (F12): valida en runtime `import.meta.env.VITE_GA_MEASUREMENT_ID` y `import.meta.env.VITE_META_PIXEL_ID`.
+
+Nota: `import.meta.env.*` no funciona directo en PowerShell/terminal; se valida en el navegador.
+
+## Eventos implementados
+- `trackPageView(path?)` -> GA4 `page_view`, Meta `PageView`.
+- `trackCTA({ eventId?, label? })` -> GA4 `click_cta`, Meta `ClickCTA`.
+- `trackBeginCheckout({ value?, currency?, eventId? })` -> GA4 `begin_checkout`, Meta `InitiateCheckout`.
+
+## Notas
+- Si faltan `VITE_GA_MEASUREMENT_ID` o `VITE_META_PIXEL_ID`, no se cargan scripts ni se envian eventos.
+- `.env`, `node_modules` y `dist` estan ignorados por git.
