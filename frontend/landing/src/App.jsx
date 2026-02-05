@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { ensureEventId, readAttribution } from './lib/attribution';
+import { trackBeginCheckout, trackCTA } from './lib/tracking/events';
 import { redirectToStripe } from './lib/stripe';
 
 function App() {
@@ -53,6 +54,8 @@ function App() {
     const currentEventId = eventId || ensureEventId();
 
     try {
+      trackCTA();
+      trackBeginCheckout({ currency: 'USD' });
       redirectToStripe(currentAttribution, currentEventId);
     } catch (error) {
       console.error('Error redirigiendo a Stripe', error);

@@ -5,62 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Landing | Incorporación y contabilidad en EE.UU.</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-
-    <script>
-      // Meta Pixel (client-side)
-      (function () {
-        const pixelId = "%VITE_META_PIXEL_ID%";
-        if (!pixelId) return;
-        window.__META_PIXEL_ID = pixelId;
-        !(function (f, b, e, v, n, t, s) {
-          if (f.fbq) return;
-          n = f.fbq = function () {
-            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-          };
-          if (!f._fbq) f._fbq = n;
-          n.push = n;
-          n.loaded = !0;
-          n.version = "2.0";
-          n.queue = [];
-          t = b.createElement(e);
-          t.async = !0;
-          t.src = v;
-          s = b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t, s);
-        })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
-
-        window.fbq("init", pixelId);
-        window.fbq("track", "PageView");
-      })();
-    </script>
-
-    <script>
-      // Google Analytics 4 (client-side)
-      (function () {
-        const measurementId = "%VITE_GA4_MEASUREMENT_ID%";
-        if (!measurementId) return;
-
-        window.__GA_MEASUREMENT_ID = measurementId;
-        window.dataLayer = window.dataLayer || [];
-        function gtag() {
-          window.dataLayer.push(arguments);
-        }
-        window.gtag = gtag;
-
-        const gaScript = document.createElement("script");
-        gaScript.async = true;
-        gaScript.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
-        document.head.appendChild(gaScript);
-
-        gtag("js", new Date());
-        gtag("config", measurementId);
-        gtag("event", "page_view", {
-          send_to: measurementId,
-          page_location: window.location.href,
-          page_path: window.location.pathname,
-        });
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
