@@ -3,14 +3,17 @@ import { GA_MEASUREMENT_ID, META_PIXEL_ID, initTracking } from './initTracking';
 const canSendGA = () => typeof window !== 'undefined' && typeof window.gtag === 'function' && !!GA_MEASUREMENT_ID;
 const canSendMeta = () => typeof window !== 'undefined' && typeof window.fbq === 'function' && !!META_PIXEL_ID;
 
-export function trackPageView() {
+export function trackPageView(path) {
   initTracking();
+
+  const page_path = path || (typeof window !== 'undefined' ? window.location.pathname : undefined);
+  const page_location = typeof window !== 'undefined' ? window.location.href : undefined;
 
   if (canSendGA()) {
     window.gtag('event', 'page_view', {
       send_to: GA_MEASUREMENT_ID,
-      page_location: window.location.href,
-      page_path: window.location.pathname,
+      page_location,
+      page_path,
     });
   }
 
@@ -19,39 +22,45 @@ export function trackPageView() {
   }
 }
 
-export function trackCTA() {
+export function trackCTA({ eventId, label = 'CTA principal' } = {}) {
   initTracking();
 
   if (canSendGA()) {
-    window.gtag('event', 'select_item', {
+    window.gtag('event', 'click_cta', {
       send_to: GA_MEASUREMENT_ID,
-      items: [{ item_name: 'CTA principal' }],
-      event_label: 'ClickCTA',
+      item_list_name: 'cta',
+      item_name: label,
+      event_label: label,
+      ...(eventId ? { event_id: eventId } : {}),
     });
   }
 
   if (canSendMeta()) {
-    window.fbq('trackCustom', 'ClickCTA');
+    const payload = { ...(eventId ? { eventID: eventId } : {}), label };
+    window.fbq('trackCustom', 'ClickCTA', payload);
   }
 }
 
-export function trackBeginCheckout({ value, currency } = {}) {
+export function trackBeginCheckout({ value, currency = 'USD', eventId } = {}) {
   initTracking();
 
   if (canSendGA()) {
     const payload = {
       send_to: GA_MEASUREMENT_ID,
-      currency: currency || 'USD',
+      currency,
+      ...(typeof value === 'number' ? { value } : {}),
+      ...(eventId ? { event_id: eventId } : {}),
     };
-    if (typeof value === 'number') payload.value = value;
 
     window.gtag('event', 'begin_checkout', payload);
   }
 
   if (canSendMeta()) {
-    const payload = {};
-    if (typeof value === 'number') payload.value = value;
-    if (currency) payload.currency = currency;
+    const payload = {
+      ...(typeof value === 'number' ? { value } : {}),
+      ...(currency ? { currency } : {}),
+      ...(eventId ? { eventID: eventId } : {}),
+    };
     window.fbq('track', 'InitiateCheckout', payload);
   }
 }

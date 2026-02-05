@@ -20,6 +20,7 @@ function App() {
     const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
     const payload = {
       eventType: 'landing_view',
+      eventId: localEventId,
       utm_source: attribution?.utm_source,
       utm_medium: attribution?.utm_medium,
       utm_campaign: attribution?.utm_campaign,
@@ -54,8 +55,8 @@ function App() {
     const currentEventId = eventId || ensureEventId();
 
     try {
-      trackCTA();
-      trackBeginCheckout({ currency: 'USD' });
+      trackCTA({ eventId: currentEventId, label: 'Comenzar ahora' });
+      trackBeginCheckout({ currency: 'USD', value: 0, eventId: currentEventId });
       redirectToStripe(currentAttribution, currentEventId);
     } catch (error) {
       console.error('Error redirigiendo a Stripe', error);

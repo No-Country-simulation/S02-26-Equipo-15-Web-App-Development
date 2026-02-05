@@ -10,11 +10,11 @@ const hasScript = (srcContains) =>
 function initGA() {
   if (!GA_MEASUREMENT_ID || gaInitialized) return;
 
-  // Prevent multiple inserts if hot reloaded
   if (!hasScript('googletagmanager.com/gtag/js')) {
     const gaScript = document.createElement('script');
     gaScript.async = true;
     gaScript.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`;
+    gaScript.setAttribute('data-ga4', GA_MEASUREMENT_ID);
     document.head.appendChild(gaScript);
   }
 
@@ -26,7 +26,7 @@ function initGA() {
     };
 
   window.gtag('js', new Date());
-  window.gtag('config', GA_MEASUREMENT_ID);
+  window.gtag('config', GA_MEASUREMENT_ID, { anonymize_ip: true });
 
   gaInitialized = true;
 }
@@ -35,7 +35,6 @@ function initMetaPixel() {
   if (!META_PIXEL_ID || metaInitialized) return;
 
   if (!window.fbq) {
-    // Standard pixel bootstrap
     const fbq = function fbq() {
       fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments);
     };
@@ -49,6 +48,7 @@ function initMetaPixel() {
       const pixelScript = document.createElement('script');
       pixelScript.async = true;
       pixelScript.src = 'https://connect.facebook.net/en_US/fbevents.js';
+      pixelScript.setAttribute('data-meta-pixel', META_PIXEL_ID);
       document.head.appendChild(pixelScript);
     }
   }
@@ -60,9 +60,7 @@ function initMetaPixel() {
 }
 
 export function initTracking() {
-  // Run on client only
   if (typeof window === 'undefined') return;
-
   initGA();
   initMetaPixel();
 }
