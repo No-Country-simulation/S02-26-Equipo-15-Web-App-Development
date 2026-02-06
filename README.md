@@ -160,7 +160,7 @@ JWT_SECRET=
 ### Backend
 ```bash
 cd backend
-./mvnw spring-boot:run
+./mvn spring-boot:run
 ````
 
 Disponible en:
