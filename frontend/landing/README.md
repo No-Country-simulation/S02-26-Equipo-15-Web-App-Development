@@ -24,9 +24,21 @@ Valores esperados en `.env.example`:
 ```env
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 VITE_META_PIXEL_ID=123456789012345
-VITE_API_BASE=http://localhost:8080
+VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/your_payment_link
 ```
+
+En produccion, `VITE_API_URL` debe apuntar al backend Railway:
+```env
+VITE_API_URL=https://s02-26-equipo-15-web-app-development-desarrollo.up.railway.app
+```
+
+Configurar en Vercel:
+1. Ir a Project Settings -> Environment Variables.
+2. Crear `VITE_API_URL` para los entornos necesarios (Preview/Production).
+3. Re-deploy para que Vite tome la variable al momento del build.
+
+Importante: en Vite solo se exponen al cliente las variables con prefijo `VITE_`.
 
 Si cambias valores de `.env`, reinicia `npm run dev` para que Vite recargue `import.meta.env`.
 
