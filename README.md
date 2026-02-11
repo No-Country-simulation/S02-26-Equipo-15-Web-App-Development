@@ -145,13 +145,40 @@ VITE_API_BASE=
 
 ### Backend (`backend/.env.example`)
 ```
-
-DATABASE_URL=
+PGHOST=
+PGPORT=
+PGDATABASE=
+PGUSER=
+PGPASSWORD=
+SPRING_PROFILES_ACTIVE=dev
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 JWT_SECRET=
+```
 
-````
+### Database configuration (Railway)
+Set these variables in Railway for the backend service:
+
+```bash
+PGHOST=<railway-postgres-host>
+PGPORT=<railway-postgres-port>
+PGDATABASE=<railway-postgres-database>
+PGUSER=<railway-postgres-user>
+PGPASSWORD=<railway-postgres-password>
+SPRING_PROFILES_ACTIVE=prod
+```
+
+For Railway development environment use:
+
+```bash
+SPRING_PROFILES_ACTIVE=dev
+```
+
+Recommended Railway healthcheck path:
+
+```text
+/actuator/health
+```
 
 ---
 
@@ -160,8 +187,14 @@ JWT_SECRET=
 ### Backend
 ```bash
 cd backend
-./mvn spring-boot:run
-````
+export PGHOST=localhost
+export PGPORT=5432
+export PGDATABASE=app_db
+export PGUSER=postgres
+export PGPASSWORD=postgres
+export SPRING_PROFILES_ACTIVE=dev
+mvn spring-boot:run
+```
 
 Disponible en:
 

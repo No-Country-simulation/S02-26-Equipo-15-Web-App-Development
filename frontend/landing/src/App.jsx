@@ -3,6 +3,7 @@ import './App.css';
 import { ensureEventId, readAttribution } from './lib/attribution';
 import { trackBeginCheckout, trackCTA } from './lib/tracking/events';
 import { redirectToStripe } from './lib/stripe';
+import { apiFetch } from './config/api';
 
 function App() {
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,6 @@ function App() {
     const localEventId = ensureEventId();
     setEventId(localEventId);
 
-    const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8080';
     const payload = {
       eventType: 'landing_view',
       eventId: localEventId,
@@ -31,20 +31,18 @@ function App() {
       landing_path: window.location.pathname,
     };
 
-    if (apiBase) {
-      fetch(`${apiBase}/api/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+    apiFetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        if (data?.eventId) setEventId(data.eventId);
       })
-        .then((res) => res.json().catch(() => ({})))
-        .then((data) => {
-          if (data?.eventId) setEventId(data.eventId);
-        })
-        .catch((err) => {
-          console.warn('No se pudo enviar landing_view al backend:', err);
-        });
-    }
+      .catch((err) => {
+        console.warn('No se pudo enviar landing_view al backend:', err);
+      });
   }, []);
 
   const trackAndGoToStripe = async () => {
