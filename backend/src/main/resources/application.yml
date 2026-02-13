@@ -3,24 +3,28 @@ server:
 
 spring:
   application:
-    name: mock-api
+    name: nocountry-api
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:dev}
+    active: ${SPRING_PROFILES_ACTIVE:local}
   datasource:
-    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
-    username: ${PGUSER}
-    password: ${PGPASSWORD}
+    url: ${DATABASE_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:app_db}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:postgres}}
     hikari:
-      maximum-pool-size: 5
+      maximum-pool-size: 10
       minimum-idle: 1
       connection-timeout: 30000
   jpa:
     open-in-view: false
+    hibernate:
+      ddl-auto: none
     properties:
       hibernate:
         jdbc:
           lob:
             non_contextual_creation: true
+  flyway:
+    enabled: true
 
 management:
   endpoints:
@@ -31,3 +35,28 @@ management:
     health:
       probes:
         enabled: true
+
+app:
+  tracking:
+    enabled: ${TRACKING_ENABLED:true}
+    rate-limit-capacity: ${TRACK_RATE_LIMIT_CAPACITY:30}
+    rate-limit-refill-per-second: ${TRACK_RATE_LIMIT_REFILL_PER_SECOND:10}
+  stripe:
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  integrations:
+    meta-capi-enabled: ${META_CAPI_ENABLED:false}
+    ga4-mp-enabled: ${GA4_MP_ENABLED:false}
+    pipedrive-enabled: ${PIPEDRIVE_ENABLED:false}
+  meta:
+    pixel-id: ${META_PIXEL_ID:}
+    access-token: ${META_ACCESS_TOKEN:}
+  ga4:
+    measurement-id: ${GA4_MEASUREMENT_ID:}
+    api-secret: ${GA4_API_SECRET:}
+  pipedrive:
+    api-token: ${PIPEDRIVE_API_TOKEN:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
+  http:
+    connect-timeout-ms: ${HTTP_CONNECT_TIMEOUT_MS:2500}
+    read-timeout-ms: ${HTTP_READ_TIMEOUT_MS:3500}

@@ -1,12 +1,8 @@
 package com.nocountry.mockapi;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+@Deprecated
+public final class MockApiApplication {
 
-@SpringBootApplication
-public class MockApiApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(MockApiApplication.class, args);
+    private MockApiApplication() {
     }
 }
