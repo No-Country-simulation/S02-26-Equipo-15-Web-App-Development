@@ -1,201 +1,62 @@
-# Resumen End-to-End del Proyecto
+﻿# Resumen End-to-End (Actualizado)
 
-## 1. Objetivo del proyecto
-Construir una **plataforma all-in-one** para incorporación, impuestos y contabilidad en EE.UU., optimizada para **ads, tracking y conversión**, con pagos vía **Stripe**, tracking **Google + Meta** y una **API centralizada** que orquesta datos, eventos y CRM.
+## 1. Objetivo
+Conectar adquisicion (ads), tracking y conversion de pago en un flujo unico con correlacion por `eventId`, persistencia en PostgreSQL e integraciones server-side.
 
----
+## 2. Flujo principal implementado
+1. La Landing envia `POST /api/track` con `eventType`, UTMs, `gclid/fbclid`, `landing_path` y `eventId` opcional.
+2. Backend:
+   - genera `eventId` si no viene,
+   - hace upsert de `tracking_session` (first-touch, sin sobreescribir UTMs iniciales),
+   - inserta `tracking_event` idempotente,
+   - devuelve exactamente `{ "eventId": "<uuid>" }`.
+3. Usuario paga en Stripe Checkout.
+4. Stripe envia webhook a `POST /api/stripe/webhook`.
+5. Backend valida firma y procesa idempotente:
+   - registra estado en `stripe_webhook_event`,
+   - crea/actualiza `orders` sin duplicar por `stripe_session_id`,
+   - registra `purchase` en `tracking_event` cuando corresponde.
+6. Backend dispara integraciones server-side (segun flags):
+   - Meta CAPI,
+   - GA4 Measurement Protocol,
+   - Pipedrive (opcional).
+7. Resultado de cada integracion queda en `integrations_log`.
 
-## 2. Arquitectura general
-Arquitectura **Frontend + Backend desacoplada**, con tracking híbrido (client + server side).
+## 3. Endpoints activos
+- `POST /api/track`
+- `POST /api/stripe/webhook`
+- `GET /api/admin/sessions`
+- `GET /api/admin/sessions/{eventId}`
+- `GET /api/admin/events`
+- `GET /api/admin/metrics`
+- `GET /api/health/db`
+- `GET /actuator/health`
 
-### Componentes principales
-- **Landing**: React + Vite (Vercel)
-- **Admin Dashboard**: React + Vite (Vercel)
-- **Backend API**: Spring Boot (Railway)
-- **Base de datos**: PostgreSQL (Railway)
-- **Pagos**: Stripe Checkout + Webhooks
-- **Tracking**:
-  - Google Analytics 4 (client)
-  - Meta Pixel (client)
-  - GA4 Server-side
-  - Meta CAPI (server-side)
-- **CRM**: Pipedrive
+## 4. Flags y configuracion
+- `TRACKING_ENABLED`
+- `META_CAPI_ENABLED`
+- `GA4_MP_ENABLED`
+- `PIPEDRIVE_ENABLED`
+- `STRIPE_WEBHOOK_SECRET`
+- `META_PIXEL_ID`, `META_ACCESS_TOKEN`
+- `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`
+- `PIPEDRIVE_API_TOKEN`
+- `CORS_ALLOWED_ORIGINS`
 
----
+## 5. Donde validar exito/falla por tramo
+- **API Track**: tabla `tracking_session` y `tracking_event`.
+- **Webhook Stripe**: tabla `stripe_webhook_event`.
+  - `PROCESSED`: webhook valido y procesado.
+  - `FAILED`: revisar columna `error` (ej. `Invalid Stripe signature`).
+- **Registro de pago**: tabla `orders`.
+- **Meta/GA4/Pipedrive server-side**: tabla `integrations_log`.
+  - `SENT`: envio exitoso.
+  - `FAILED`: error y status HTTP cuando exista.
+  - `SKIPPED`: integracion deshabilitada o sin credenciales.
 
-## 3. Flujo end-to-end
+## 6. Nota importante sobre GA4(client) y Meta Pixel(client)
+El backend **no puede confirmar** directamente los eventos client-side (`GA4 client` y `Meta Pixel client`) porque salen del navegador. Esos se validan en:
+- GA4 DebugView / Reportes,
+- Meta Events Manager.
 
-1. Usuario entra a la **Landing** desde campañas de Google o Meta.
-2. Se capturan parámetros UTM (`utm_source`, `utm_medium`, `utm_campaign`, `gclid`, `fbclid`).
-3. La Landing dispara eventos **client-side**:
-   - `landing_view`
-   - `cta_click`
-4. Usuario paga mediante **Stripe Checkout**.
-5. Stripe envía **webhook** a la API (`payment_intent.succeeded`).
-6. La API:
-   - Guarda la transacción en PostgreSQL
-   - Envía eventos **server-side** a GA4 y Meta CAPI
-   - Crea / actualiza un deal en **Pipedrive**
-7. El Admin Dashboard consume la API para reporting.
-
-
----
-```mermaid
-sequenceDiagram
-  autonumber
-  participant U as Usuario
-  participant L as Landing (React/Vite)
-  participant API as API (Spring Boot)
-  participant GA as GA4 (client)
-  participant MP as Meta Pixel (client)
-  participant ST as Stripe Checkout
-  participant DB as Postgres
-  participant CAPI as Meta CAPI (server)
-  participant GMP as GA4 Server-side (server)
-  participant PD as Pipedrive
-
-  U->>L: Entra a landing con UTM/gclid/fbclid
-  L->>L: readAttribution() + ensureEventId()
-  L->>API: POST /api/track (landing_view + UTMs + ids + landing_path)
-  API->>DB: Guarda tracking_event (eventId)
-  API-->>L: Responde {eventId}
-
-  L->>GA: page_view (auto)
-  L->>MP: PageView (auto)
-
-  U->>L: Click CTA "Comenzar ahora"
-  L->>GA: click_cta + begin_checkout
-  L->>MP: track CustomEvent (ej. Lead/InitiateCheckout)
-  L->>ST: Redirect a Payment Link / Checkout (con params eventId/utm/gclid/fbclid)
-
-  ST-->>API: webhook checkout.session.completed / payment_intent.succeeded
-  API->>DB: Guarda transacción + vincula con eventId
-  API->>GMP: Envía purchase/checkout server-side (measurement protocol)
-  API->>CAPI: Envía Purchase server-side (event_id para dedup)
-  API->>PD: Crea/actualiza Deal/Person con datos del pago
-```
----
-
-## 4. Stripe (Pagos)
-
-### Implementado
-- Uso de **Stripe Payment Links / Checkout**
-- Webhook configurado en backend
-- Eventos procesados:
-  - `payment_intent.succeeded`
-  - `checkout.session.completed`
-
-### Responsabilidades de la API
-- Validar firma del webhook
-- Normalizar datos de pago
-- Persistir transacciones
-- Disparar tracking server-side
-
----
-
-## 5. Tracking y Analytics
-
-### Client-side (Landing)
-- **Google Analytics 4**
-- **Meta Pixel**
-- Eventos enviados solo para interacción del usuario
-
-### Server-side (API)
-- **GA4 Measurement Protocol**
-- **Meta Conversion API (CAPI)**
-
-### Beneficios
-- Mejor atribución
-- Menos pérdida por adblockers
-- Matching correcto con pagos reales
-
----
-
-## 6. API Backend (Spring Boot)
-
-### Rol
-La API es el **orquestador central** del sistema:
-- Datos
-- Pagos
-- Tracking
-- CRM
-
-### Responsabilidades
-- Endpoints REST para frontend
-- Recepción de webhooks
-- Persistencia en DB
-- Envío de eventos server-side
-- Integración con Pipedrive
-
-### Estructura sugerida
-```
-backend/
- └── src/main/java/com/notcountry/api/
-     ├── controller/
-     │   ├── TrackController
-     │   ├── PaymentController
-     │   └── AdminController
-     ├── service/
-     │   ├── TrackingService
-     │   ├── StripeService
-     │   ├── PipedriveService
-     │   └── AnalyticsService
-     ├── repository/
-     │   └── TransactionRepository
-     ├── model/
-     │   └── Transaction
-     └── config/
-         ├── StripeConfig
-         └── AnalyticsConfig
-```
-
----
-```mermaid
-flowchart TD
-  FE[Landing/Admin] -->|POST /api/track| T[TrackingController]
-  ST[Stripe Webhook] -->|POST /webhooks/stripe| W[WebhookController]
-
-  T --> S1[TrackingService] --> R1[(TrackingEventRepository)] --> DB[(Postgres)]
-  W --> S2[PaymentService] --> R2[(PaymentRepository)] --> DB
-
-  S2 --> GA[GA4 Server-side]
-  S2 --> META[Meta CAPI]
-  S2 --> PD[Pipedrive Service]
-```
-
----
-## 7. Git
-
-### Qué se hizo
-- Se crea repositorio S02-26-Equipo-15-Web-App-Development
-- Se puede actualizar de forma controlada
-
-### Ubicación
-```
-No-Country-simulation/S02-26-Equipo-15-Web-App-Development
-```
----
-
-## 8. Estado actual
-
-### Hecho
-- Arquitectura definida
-- Landing funcional
-- Stripe integrado
-- Webhooks funcionando
-- Tracking Google + Meta validado
-- API recibiendo eventos
-- Submodule configurado
-
-### Próximos pasos
-- Endpoints de reporting
-- Hardening de webhooks
-- Manejo de errores y retries
-- Dashboards en Admin
-- Infra (env vars, secrets, prod)
-
----
-
-## 9. Conclusión
-El proyecto ya cuenta con una **base técnica sólida**, preparada para escalar campañas, medir correctamente conversiones y centralizar operaciones de negocio en una única API.
-
+La parte server-side si queda trazada en `integrations_log`.
