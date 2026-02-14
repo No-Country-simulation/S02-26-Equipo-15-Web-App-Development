@@ -78,3 +78,12 @@ sequenceDiagram
 - **Rate limit**: token bucket in-memory por `ip_hash` en `/api/track`
 - **Errores uniformes**: `{"error","message","details"}`
 - **CORS configurable**: `CORS_ALLOWED_ORIGINS` (sin `*` en `prod`)
+
+## 6. Estado de esquema
+- El modelo legado (`users`, `attributions`, `landing_events`, `payments`) fue retirado por migracion Flyway `V4__drop_legacy_tables.sql`.
+- El flujo end-to-end de esta arquitectura usa solo:
+  - `tracking_session`
+  - `tracking_event`
+  - `orders`
+  - `stripe_webhook_event`
+  - `integrations_log`
