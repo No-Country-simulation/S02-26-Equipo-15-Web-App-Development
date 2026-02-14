@@ -60,3 +60,13 @@ El backend **no puede confirmar** directamente los eventos client-side (`GA4 cli
 - Meta Events Manager.
 
 La parte server-side si queda trazada en `integrations_log`.
+
+## 7. Limpieza de esquema aplicada
+- Se agrego migracion Flyway `V4__drop_legacy_tables.sql`.
+- Se removieron tablas legadas: `users`, `attributions`, `landing_events`, `payments`.
+- Desde esta migracion, el backend opera con un unico modelo activo:
+  - `tracking_session`
+  - `tracking_event`
+  - `orders`
+  - `stripe_webhook_event`
+  - `integrations_log`

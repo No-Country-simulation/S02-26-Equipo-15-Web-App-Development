@@ -87,6 +87,7 @@ erDiagram
 - `V1__init.sql`: tablas core (`tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`) + indices.
 - `V2__integrations_log.sql`: crea `integrations_log`.
 - `V3__normalize_integrations_log_jsonb.sql`: normaliza `request_payload` y `response_payload` a `jsonb`.
+- `V4__drop_legacy_tables.sql`: elimina tablas legadas (`users`, `attributions`, `landing_events`, `payments`) para evitar doble modelo.
 
 ## 5. Consultas de verificacion rapida
 ```sql
@@ -114,4 +115,10 @@ SELECT integration, reference_id, status, http_status, latency_ms, error_message
 FROM integrations_log
 ORDER BY created_at DESC
 LIMIT 50;
+
+-- Confirmar que no quedan tablas legadas del modelo anterior
+SELECT tablename
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN ('users', 'attributions', 'landing_events', 'payments');
 ```
