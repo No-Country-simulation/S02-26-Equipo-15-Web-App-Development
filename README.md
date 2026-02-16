@@ -1,208 +1,171 @@
-# S02-26 – Equipo 15 | Web App Development
+# S02-26-Equipo-15 | Web App Development
 
-Proyecto desarrollado en el contexto de **No Country**.  
-El objetivo es construir una plataforma web orientada a **tracking de conversiones y pagos**, con una **landing de ventas**, un **panel administrador** y un **backend** que integra Stripe y plataformas de ads (Meta y Google).
+Monorepo del equipo 15 para conversion tracking y pagos con Stripe.
 
----
+## Objetivo del proyecto
 
-## 🧱 Arquitectura del proyecto
+Construir una plataforma con:
 
-Repositorio en formato **monorepo**, con separación clara de responsabilidades:
+- Landing de conversion (React + Vite)
+- Backend de tracking/pagos (Spring Boot + PostgreSQL)
+- Integraciones server-side (GA4 MP, Meta CAPI, Pipedrive opcional)
+- Panel administrador para consulta de datos (pendiente de desarrollo frontend)
 
-```
+## Estado actual de modulos
 
+- `backend/`: implementado y operativo
+- `frontend/landing/`: implementado y operativo
+- `frontend/admin/`: pendiente de desarrollo (planificado)
+- `infra/`: documentacion tecnica actualizada
+
+## Arquitectura del proyecto
+
+```text
 /
-├── backend/                 # API – Java Spring Boot
-├── frontend/
-│   ├── landing/             # Landing + Checkout (React + Vite)
-│   └── admin/               # Panel Administrador (React + Vite)
-├── infra/                   # Documentación de infraestructura y deploy
-└── README.md
-
+|-- backend/                 # API - Spring Boot 3 / Java 17
+|-- frontend/
+|   |-- landing/             # Landing + Checkout (React + Vite)
+|   `-- admin/               # Panel Administrador (pendiente)
+|-- infra/                   # Documentacion de arquitectura y modelo de datos
+|-- BDD/                     # Material de apoyo historico
+`-- README.md
 ```
 
-### Arquitectura end-to-end
+## Arquitectura end-to-end
 
 ```mermaid
 flowchart LR
-  %% ===== Usuarios =====
-  U[Usuario / Cliente]
-  A[Operador / Admin]
+  U[Usuario] --> L[Landing React/Vite]
+  A[Operador/Admin] --> AD[Admin Dashboard React/Vite\npendiente]
 
-  %% ===== Frontend =====
-  L[Landing\nReact + Vite\nVercel]
-  AD[Admin Dashboard\nReact + Vite\nVercel]
+  L -->|POST /api/track| API[Backend API Spring Boot]
+  L -->|Stripe Checkout| ST[Stripe]
+  ST -->|Webhooks firmados| API
 
-  %% ===== Backend =====
-  API[Backend API\nSpring Boot\nRailway]
+  AD -.->|GET /api/admin/*| API
 
-  %% ===== Pagos =====
-  ST[Stripe Checkout]
-
-  %% ===== Datos =====
-  DB[(PostgreSQL\nRailway)]
-
-  %% ===== Tracking =====
-  GA[Google Analytics 4]
-  MP[Meta Pixel]
-  CAPI[Meta CAPI]
-  GMP[GA4 Server-side]
-
-  %% ===== CRM =====
-  PD[Pipedrive CRM]
-
-  %% ===== Flujos =====
-  U --> L
-  A --> AD
-
-  L -->|API calls| API
-  AD -->|API calls| API
-
-  L -->|Checkout / Payment Link| ST
-  ST -->|Webhook: payment success| API
-
-  API -->|Guardar transacción| DB
-  AD <-->|Consultar datos| API
-
-  L -->|Eventos client-side| GA
-  L -->|Eventos client-side| MP
-
-  API -->|Eventos server-side| CAPI
-  API -->|Eventos server-side| GMP
-
-  API -->|Crear / actualizar deal| PD
+  API --> DB[(PostgreSQL + Flyway)]
+  L --> GAC[GA4 client]
+  L --> MPC[Meta Pixel client]
+  API --> GASS[GA4 MP server-side]
+  API --> MCAPI[Meta CAPI server-side]
+  API --> PD[Pipedrive opcional]
 ```
 
-### Despliegue
-- **Backend** → Railway (API pública)
-- **Base de datos** → PostgreSQL (Railway)
-- **Frontend Landing** → Vercel
-- **Frontend Admin** → Vercel
+## Flujo transaccional
 
----
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as Usuario
+  participant L as Landing
+  participant API as Backend API
+  participant ST as Stripe
+  participant DB as Postgres
 
-## 🚀 Stack tecnológico
+  U->>L: Entra con UTM/gclid/fbclid
+  L->>API: POST /api/track (landing_view + attribution)
+  API->>DB: upsert tracking_session + insert tracking_event
+  API-->>L: { "eventId": "<uuid>" }
 
-### Backend
-- Java 17+
-- Spring Boot
-- PostgreSQL
-- Stripe (pagos y webhooks)
+  U->>ST: Completa pago
+  ST->>API: payment_intent.succeeded
+  ST->>API: checkout.session.completed
 
-### Frontend
-- React
-- Vite
-- JavaScript
-- Integración con Stripe, Meta Pixel y Google Analytics (GA4)
-
-### Infraestructura
-- GitHub (monorepo)
-- Railway
-- Vercel
-
----
-
-## 🌱 Flujo de trabajo con Git
-
-- `main` → rama estable (entregables / demo)
-- `develop` → integración continua del sprint
-- `feature/<ticket>-<descripcion>` → desarrollo por funcionalidad
-
-Ejemplos:
+  API->>DB: stripe_webhook_event (idempotencia)
+  API->>DB: upsert orders (sin duplicados)
+  API->>DB: tracking_event purchase
+  API->>DB: integrations_log (GA4_MP / META_CAPI / PIPEDRIVE)
 ```
 
-feature/NC-01-landing-checkout
-feature/NC-02-admin-transactions
-feature/NC-03-stripe-webhook
+## Endpoints backend
 
+- `POST /api/track`
+- `POST /api/stripe/webhook`
+- `GET /api/admin/sessions`
+- `GET /api/admin/sessions/{eventId}`
+- `GET /api/admin/events`
+- `GET /api/admin/metrics`
+- `GET /api/health/db`
+- `GET /actuator/health`
+
+## Modelo de datos (resumen)
+
+```mermaid
+erDiagram
+  TRACKING_SESSION ||--o{ TRACKING_EVENT : has
+  TRACKING_SESSION ||--o{ ORDERS : links
+  TRACKING_SESSION ||--o{ STRIPE_WEBHOOK_EVENT : correlates
 ```
 
-Todo el código se integra mediante **Pull Requests**.
+Tablas activas:
 
----
+- `tracking_session`
+- `tracking_event`
+- `orders`
+- `stripe_webhook_event`
+- `integrations_log`
 
-## 🔐 Variables de entorno
+## Flujo de ramas Git
 
-⚠️ **Nunca subir archivos `.env` al repositorio**  
-Usar siempre archivos `.env.example`.
-
-### Frontend Landing (`frontend/landing/.env.example`)
+```mermaid
+gitGraph
+  commit id: "init"
+  branch develop
+  checkout develop
+  commit id: "integracion"
+  branch feature/tracking
+  checkout feature/tracking
+  commit id: "feat"
+  checkout develop
+  merge feature/tracking
+  branch feature/webhook
+  checkout feature/webhook
+  commit id: "feat"
+  checkout develop
+  merge feature/webhook
+  checkout main
+  merge develop tag: "release"
 ```
 
-VITE_STRIPE_PAYMENT_LINK=
-VITE_API_BASE=
-VITE_META_PIXEL_ID=
-VITE_GA_MEASUREMENT_ID=
-
-```
-
-### Frontend Admin (`frontend/admin/.env.example`)
-```
-
-VITE_API_BASE=
-
-```
+## Variables de entorno clave
 
 ### Backend (`backend/.env.example`)
-```
-PGHOST=
-PGPORT=
-PGDATABASE=
-PGUSER=
-PGPASSWORD=
-SPRING_PROFILES_ACTIVE=dev
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-JWT_SECRET=
-```
 
-### Database configuration (Railway)
-Set these variables in Railway for the backend service:
+- `SPRING_PROFILES_ACTIVE`
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `STRIPE_WEBHOOK_SECRET`
+- `TRACKING_ENABLED`
+- `META_CAPI_ENABLED`
+- `META_PIXEL_ID`
+- `META_ACCESS_TOKEN`
+- `GA4_MP_ENABLED`
+- `GA4_MEASUREMENT_ID`
+- `GA4_API_SECRET`
+- `GA4_MP_DEBUG_VALIDATION_ENABLED`
+- `PIPEDRIVE_ENABLED`
+- `PIPEDRIVE_API_TOKEN`
+- `CORS_ALLOWED_ORIGINS`
 
-```bash
-PGHOST=<railway-postgres-host>
-PGPORT=<railway-postgres-port>
-PGDATABASE=<railway-postgres-database>
-PGUSER=<railway-postgres-user>
-PGPASSWORD=<railway-postgres-password>
-SPRING_PROFILES_ACTIVE=prod
-```
+### Landing (`frontend/landing/.env.example`)
 
-For Railway development environment use:
+- `VITE_STRIPE_PAYMENT_LINK`
+- `VITE_API_URL`
+- `VITE_GA_MEASUREMENT_ID`
+- `VITE_META_PIXEL_ID`
 
-```bash
-SPRING_PROFILES_ACTIVE=dev
-```
-
-Recommended Railway healthcheck path:
-
-```text
-/actuator/health
-```
-
----
-
-## ▶️ Ejecución en local
+## Ejecucion local
 
 ### Backend
+
 ```bash
 cd backend
-export PGHOST=localhost
-export PGPORT=5432
-export PGDATABASE=app_db
-export PGUSER=postgres
-export PGPASSWORD=postgres
-export SPRING_PROFILES_ACTIVE=dev
 mvn spring-boot:run
 ```
 
-Disponible en:
-
-```
-http://localhost:8080
-```
-
-### Frontend Landing
+### Landing
 
 ```bash
 cd frontend/landing
@@ -210,80 +173,10 @@ npm install
 npm run dev
 ```
 
-Disponible en:
+## Documentacion complementaria
 
-```
-http://localhost:5173
-```
-
-### Frontend Admin
-
-```bash
-cd frontend/admin
-npm install
-npm run dev
-```
-
-Disponible en:
-
-```
-http://localhost:5174
-```
-
----
-
-## 👥 Roles del equipo
-
-* **Backend**
-
-  * Desarrollo de API
-  * Integración con Stripe
-  * Webhooks de pagos
-  * Persistencia en base de datos
-
-* **Frontend**
-
-  * Landing (UX, checkout, tracking)
-  * Admin (dashboard y visualización de transacciones)
-
-* **QA**
-
-  * Testing funcional
-  * Validación de pagos en modo test
-  * Verificación de eventos de tracking (Meta / GA4)
-
----
-
-## 📌 Convenciones del proyecto
-
-* No subir:
-
-  * `node_modules`
-  * `target`
-  * `.env`
-* Commits claros y descriptivos
-* Desarrollo siempre desde `develop`
-
----
-
-## 📄 Documentación adicional
-
-* Infraestructura y deploy: `infra/`
-* Diagramas: `infra/diagrams/`
-
----
-
-## 🧾 Licencia
-
-Este proyecto se distribuye bajo la licencia MIT. Revisa el archivo `LICENSE` en la raíz del repositorio para más detalles.
-
----
-
-## 🏁 Estado del proyecto
-
-🟡 En desarrollo – Sprint inicial
-Repositorio y arquitectura base configurados.
-
-```
-
-
+- `backend/README.md`
+- `frontend/landing/README.md`
+- `infra/arquitectura_end-to-end.md`
+- `infra/modelo_bdd.md`
+- `infra/resumen_end_to_end.md`
