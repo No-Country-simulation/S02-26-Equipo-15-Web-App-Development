@@ -43,11 +43,34 @@ public class IntegrationLogService {
             Object responsePayload,
             String errorMessage
     ) {
+        logWithReference(
+                integration,
+                eventId == null ? null : eventId.toString(),
+                status,
+                httpStatus,
+                latencyMs,
+                requestPayload,
+                responsePayload,
+                errorMessage
+        );
+    }
+
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
+    public void logWithReference(
+            String integration,
+            String referenceId,
+            String status,
+            Integer httpStatus,
+            Integer latencyMs,
+            Object requestPayload,
+            Object responsePayload,
+            String errorMessage
+    ) {
         try {
             IntegrationLog row = new IntegrationLog();
             row.setId(UUID.randomUUID());
             row.setIntegration(integration);
-            row.setReferenceId(eventId == null ? null : eventId.toString());
+            row.setReferenceId(trimReference(referenceId));
             row.setStatus(status);
             row.setHttpStatus(httpStatus);
             row.setLatencyMs(latencyMs);
@@ -58,7 +81,7 @@ public class IntegrationLogService {
             integrationLogRepository.save(row);
         } catch (Exception ex) {
             log.warn("integration_log status=failed_to_persist integration={} referenceId={} error={}",
-                    integration, eventId, ex.getMessage());
+                    integration, referenceId, ex.getMessage());
         }
     }
 
@@ -82,5 +105,12 @@ public class IntegrationLogService {
             return null;
         }
         return value.length() > 2000 ? value.substring(0, 2000) : value;
+    }
+
+    private String trimReference(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.length() > 255 ? value.substring(0, 255) : value;
     }
 }

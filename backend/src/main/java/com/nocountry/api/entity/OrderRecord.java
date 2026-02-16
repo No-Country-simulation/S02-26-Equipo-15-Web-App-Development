@@ -35,6 +35,9 @@ public class OrderRecord {
     @Column(name = "status", nullable = false, length = 64)
     private String status;
 
+    @Column(name = "business_status", nullable = false, length = 32)
+    private String businessStatus;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -92,6 +95,14 @@ public class OrderRecord {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getBusinessStatus() {
+        return businessStatus;
+    }
+
+    public void setBusinessStatus(String businessStatus) {
+        this.businessStatus = businessStatus;
     }
 
     public Instant getCreatedAt() {

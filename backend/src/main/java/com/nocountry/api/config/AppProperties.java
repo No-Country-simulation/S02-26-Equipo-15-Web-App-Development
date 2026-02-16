@@ -145,6 +145,7 @@ public class AppProperties {
     public static class Ga4 {
         private String measurementId = "";
         private String apiSecret = "";
+        private boolean debugValidationEnabled = false;
 
         public String getMeasurementId() {
             return measurementId;
@@ -160,6 +161,14 @@ public class AppProperties {
 
         public void setApiSecret(String apiSecret) {
             this.apiSecret = apiSecret;
+        }
+
+        public boolean isDebugValidationEnabled() {
+            return debugValidationEnabled;
+        }
+
+        public void setDebugValidationEnabled(boolean debugValidationEnabled) {
+            this.debugValidationEnabled = debugValidationEnabled;
         }
     }
 

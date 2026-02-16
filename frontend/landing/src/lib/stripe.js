@@ -9,7 +9,12 @@ export function buildStripeUrl(attribution = {}, eventId) {
   const paymentLink = resolvePaymentLink();
   const url = new URL(paymentLink);
 
-  if (eventId) url.searchParams.set('nc_event_id', eventId);
+  if (eventId) {
+    // Stripe Checkout exposes this as session.client_reference_id in webhook payload.
+    url.searchParams.set('client_reference_id', eventId);
+    // Keep legacy param for backward compatibility on frontend-only flows.
+    url.searchParams.set('nc_event_id', eventId);
+  }
 
   TRACKED_PARAMS.forEach((param) => {
     const value = attribution?.[param];

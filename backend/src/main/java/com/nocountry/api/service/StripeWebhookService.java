@@ -10,9 +10,9 @@ import com.nocountry.api.integration.PurchaseIntegrationPayload;
 import com.nocountry.api.integration.stripe.StripeSignatureVerifier;
 import com.nocountry.api.repository.OrderRepository;
 import com.nocountry.api.repository.StripeWebhookEventRepository;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -57,10 +57,10 @@ public class StripeWebhookService {
         this.clock = clock;
     }
 
-    @Transactional
     public void process(String payload, String signatureHeader, RequestMetadata metadata) {
         String stripeEventId = extractStripeEventId(payload);
         StripeWebhookEvent webhookEvent = null;
+        UUID resolvedEventId = null;
 
         try {
             webhookEvent = findOrCreateEvent(stripeEventId);
@@ -76,17 +76,27 @@ public class StripeWebhookService {
 
             JsonNode root = objectMapper.readTree(payload);
             String eventType = text(root, "type");
+            resolvedEventId = extractTrackingEventIdFromRoot(root, eventType);
 
             if ("checkout.session.completed".equals(eventType)) {
-                handleCheckoutCompleted(root, payload, metadata);
+                UUID handledEventId = handleCheckoutCompleted(root, payload, metadata);
+                if (handledEventId != null) {
+                    resolvedEventId = handledEventId;
+                }
             } else if ("payment_intent.succeeded".equals(eventType)) {
-                handlePaymentIntentSucceeded(root, payload, metadata);
+                UUID handledEventId = handlePaymentIntentSucceeded(root, payload, metadata);
+                if (handledEventId != null) {
+                    resolvedEventId = handledEventId;
+                }
             }
 
             if (webhookEvent != null) {
                 webhookEvent.setStatus("PROCESSED");
                 webhookEvent.setProcessedAt(Instant.now(clock));
                 webhookEvent.setError(null);
+                if (resolvedEventId != null) {
+                    webhookEvent.setEventId(resolvedEventId);
+                }
                 stripeWebhookEventRepository.save(webhookEvent);
             }
 
@@ -96,13 +106,16 @@ public class StripeWebhookService {
                 webhookEvent.setStatus("FAILED");
                 webhookEvent.setProcessedAt(Instant.now(clock));
                 webhookEvent.setError(trimError(ex.getMessage()));
+                if (resolvedEventId != null) {
+                    webhookEvent.setEventId(resolvedEventId);
+                }
                 stripeWebhookEventRepository.save(webhookEvent);
             }
             log.warn("stripe_webhook status=failed stripeEventId={} error={}", stripeEventId, ex.getMessage());
         }
     }
 
-    private void handleCheckoutCompleted(JsonNode root, String rawPayload, RequestMetadata metadata) {
+    private UUID handleCheckoutCompleted(JsonNode root, String rawPayload, RequestMetadata metadata) {
         JsonNode session = root.path("data").path("object");
 
         String stripeSessionId = text(session, "id");
@@ -120,25 +133,55 @@ public class StripeWebhookService {
         String customerEmail = extractCheckoutCustomerEmail(session);
         String customerName = extractCheckoutCustomerName(session);
 
+        if (!isBlank(paymentIntentId)) {
+            Optional<OrderRecord> existingByPaymentIntent = orderRepository.findByPaymentIntentId(paymentIntentId);
+            if (existingByPaymentIntent.isPresent()) {
+                OrderRecord existingOrder = existingByPaymentIntent.get();
+                boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
+                boolean gainedEventId = false;
+                upsertStripeSessionId(existingOrder, stripeSessionId, paymentIntentId);
+                existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
+                existingOrder.setStatus(status);
+                existingOrder.setBusinessStatus(toBusinessStatus(status));
+                existingOrder.setCurrency(currency);
+                existingOrder.setAmount(amount);
+                if (existingOrder.getEventId() == null && eventId != null) {
+                    existingOrder.setEventId(eventId);
+                    gainedEventId = true;
+                }
+                saveOrderResilient(existingOrder, paymentIntentId, stripeSessionId);
+
+                if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
+                    processSuccessfulPayment(existingOrder, rawPayload, metadata, clientId, customerEmail, customerName);
+                } else {
+                    log.info("stripe_order duplicate paymentIntentId={} status={}", paymentIntentId, status);
+                }
+                return existingOrder.getEventId();
+            }
+        }
+
         Optional<OrderRecord> existing = orderRepository.findByStripeSessionId(stripeSessionId);
         if (existing.isPresent()) {
             OrderRecord existingOrder = existing.get();
             boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
+            boolean gainedEventId = false;
             existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
             existingOrder.setStatus(status);
+            existingOrder.setBusinessStatus(toBusinessStatus(status));
             existingOrder.setCurrency(currency);
             existingOrder.setAmount(amount);
             if (existingOrder.getEventId() == null && eventId != null) {
                 existingOrder.setEventId(eventId);
+                gainedEventId = true;
             }
-            orderRepository.save(existingOrder);
+            saveOrderResilient(existingOrder, paymentIntentId, stripeSessionId);
 
-            if (!wasSuccessful && isSuccessfulStatus(status)) {
+            if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
                 processSuccessfulPayment(existingOrder, rawPayload, metadata, clientId, customerEmail, customerName);
             } else {
                 log.info("stripe_order duplicate stripeSessionId={} status={}", stripeSessionId, status);
             }
-            return;
+            return existingOrder.getEventId();
         }
 
         OrderRecord orderRecord = new OrderRecord();
@@ -149,17 +192,41 @@ public class StripeWebhookService {
         orderRecord.setAmount(amount);
         orderRecord.setCurrency(currency);
         orderRecord.setStatus(status);
+        orderRecord.setBusinessStatus(toBusinessStatus(status));
         orderRecord.setCreatedAt(Instant.now(clock));
-        orderRepository.save(orderRecord);
+        OrderRecord persistedOrder = saveOrderResilient(orderRecord, paymentIntentId, stripeSessionId);
+
+        if (!orderRecord.getId().equals(persistedOrder.getId())) {
+            boolean wasSuccessful = isSuccessfulStatus(persistedOrder.getStatus());
+            boolean gainedEventId = false;
+            persistedOrder.setPaymentIntentId(coalesce(persistedOrder.getPaymentIntentId(), paymentIntentId));
+            persistedOrder.setStatus(status);
+            persistedOrder.setBusinessStatus(toBusinessStatus(status));
+            persistedOrder.setCurrency(currency);
+            persistedOrder.setAmount(amount);
+            if (persistedOrder.getEventId() == null && eventId != null) {
+                persistedOrder.setEventId(eventId);
+                gainedEventId = true;
+            }
+            saveOrderResilient(persistedOrder, paymentIntentId, stripeSessionId);
+
+            if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
+                processSuccessfulPayment(persistedOrder, rawPayload, metadata, clientId, customerEmail, customerName);
+            } else {
+                log.info("stripe_order duplicate stripeSessionId={} status={}", stripeSessionId, status);
+            }
+            return persistedOrder.getEventId();
+        }
 
         if (isSuccessfulStatus(status)) {
-            processSuccessfulPayment(orderRecord, rawPayload, metadata, clientId, customerEmail, customerName);
+            processSuccessfulPayment(persistedOrder, rawPayload, metadata, clientId, customerEmail, customerName);
         } else {
             log.info("stripe_order pending stripeSessionId={} status={}", stripeSessionId, status);
         }
+        return persistedOrder.getEventId();
     }
 
-    private void handlePaymentIntentSucceeded(JsonNode root, String rawPayload, RequestMetadata metadata) {
+    private UUID handlePaymentIntentSucceeded(JsonNode root, String rawPayload, RequestMetadata metadata) {
         JsonNode paymentIntent = root.path("data").path("object");
 
         String paymentIntentId = text(paymentIntent, "id");
@@ -185,42 +252,54 @@ public class StripeWebhookService {
         if (existingByPaymentIntent.isPresent()) {
             OrderRecord existingOrder = existingByPaymentIntent.get();
             boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
+            boolean gainedEventId = false;
+            if (eventId == null) {
+                eventId = existingOrder.getEventId();
+            }
             existingOrder.setStatus(status);
+            existingOrder.setBusinessStatus(toBusinessStatus(status));
             existingOrder.setAmount(amount);
             existingOrder.setCurrency(currency);
-            existingOrder.setStripeSessionId(coalesce(existingOrder.getStripeSessionId(), stripeSessionId));
+            upsertStripeSessionId(existingOrder, stripeSessionId, paymentIntentId);
             if (existingOrder.getEventId() == null && eventId != null) {
                 existingOrder.setEventId(eventId);
+                gainedEventId = true;
             }
-            orderRepository.save(existingOrder);
+            saveOrderResilient(existingOrder, paymentIntentId, stripeSessionId);
 
-            if (!wasSuccessful && isSuccessfulStatus(status)) {
+            if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
                 processSuccessfulPayment(existingOrder, rawPayload, metadata, clientId, customerEmail, customerName);
             } else {
                 log.info("stripe_order duplicate paymentIntentId={} status={}", paymentIntentId, status);
             }
-            return;
+            return existingOrder.getEventId();
         }
 
         Optional<OrderRecord> existingBySession = orderRepository.findByStripeSessionId(stripeSessionId);
         if (existingBySession.isPresent()) {
             OrderRecord existingOrder = existingBySession.get();
             boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
+            boolean gainedEventId = false;
+            if (eventId == null) {
+                eventId = existingOrder.getEventId();
+            }
             existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
             existingOrder.setStatus(status);
+            existingOrder.setBusinessStatus(toBusinessStatus(status));
             existingOrder.setAmount(amount);
             existingOrder.setCurrency(currency);
             if (existingOrder.getEventId() == null && eventId != null) {
                 existingOrder.setEventId(eventId);
+                gainedEventId = true;
             }
-            orderRepository.save(existingOrder);
+            saveOrderResilient(existingOrder, paymentIntentId, stripeSessionId);
 
-            if (!wasSuccessful && isSuccessfulStatus(status)) {
+            if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
                 processSuccessfulPayment(existingOrder, rawPayload, metadata, clientId, customerEmail, customerName);
             } else {
                 log.info("stripe_order duplicate stripeSessionId={} status={}", stripeSessionId, status);
             }
-            return;
+            return existingOrder.getEventId();
         }
 
         OrderRecord orderRecord = new OrderRecord();
@@ -231,14 +310,42 @@ public class StripeWebhookService {
         orderRecord.setAmount(amount);
         orderRecord.setCurrency(currency);
         orderRecord.setStatus(status);
+        orderRecord.setBusinessStatus(toBusinessStatus(status));
         orderRecord.setCreatedAt(Instant.now(clock));
-        orderRepository.save(orderRecord);
+        OrderRecord persistedOrder = saveOrderResilient(orderRecord, paymentIntentId, stripeSessionId);
+
+        if (!orderRecord.getId().equals(persistedOrder.getId())) {
+            boolean wasSuccessful = isSuccessfulStatus(persistedOrder.getStatus());
+            boolean gainedEventId = false;
+            if (eventId == null) {
+                eventId = persistedOrder.getEventId();
+            }
+            persistedOrder.setPaymentIntentId(coalesce(persistedOrder.getPaymentIntentId(), paymentIntentId));
+            persistedOrder.setStatus(status);
+            persistedOrder.setBusinessStatus(toBusinessStatus(status));
+            persistedOrder.setAmount(amount);
+            persistedOrder.setCurrency(currency);
+            upsertStripeSessionId(persistedOrder, stripeSessionId, paymentIntentId);
+            if (persistedOrder.getEventId() == null && eventId != null) {
+                persistedOrder.setEventId(eventId);
+                gainedEventId = true;
+            }
+            saveOrderResilient(persistedOrder, paymentIntentId, stripeSessionId);
+
+            if (shouldDispatchSuccessfulPayment(wasSuccessful, status, gainedEventId)) {
+                processSuccessfulPayment(persistedOrder, rawPayload, metadata, clientId, customerEmail, customerName);
+            } else {
+                log.info("stripe_order duplicate paymentIntentId={} status={}", paymentIntentId, status);
+            }
+            return persistedOrder.getEventId();
+        }
 
         if (isSuccessfulStatus(status)) {
-            processSuccessfulPayment(orderRecord, rawPayload, metadata, clientId, customerEmail, customerName);
+            processSuccessfulPayment(persistedOrder, rawPayload, metadata, clientId, customerEmail, customerName);
         } else {
             log.info("stripe_order pending paymentIntentId={} status={}", paymentIntentId, status);
         }
+        return persistedOrder.getEventId();
     }
 
     private StripeWebhookEvent findOrCreateEvent(String stripeEventId) {
@@ -256,10 +363,27 @@ public class StripeWebhookService {
                 });
     }
 
+    private UUID extractTrackingEventIdFromRoot(JsonNode root, String eventType) {
+        JsonNode objectNode = root.path("data").path("object");
+        if (objectNode.isMissingNode() || objectNode.isNull()) {
+            return null;
+        }
+
+        if ("checkout.session.completed".equals(eventType)) {
+            return extractTrackingEventId(objectNode);
+        }
+
+        if ("payment_intent.succeeded".equals(eventType)) {
+            return extractTrackingEventIdFromMetadata(objectNode.path("metadata"));
+        }
+
+        return null;
+    }
+
     private UUID extractTrackingEventId(JsonNode session) {
-        String metadataEventId = text(session.path("metadata"), "eventId");
-        if (!isBlank(metadataEventId)) {
-            return parseUuid(metadataEventId);
+        UUID fromMetadata = extractTrackingEventIdFromMetadata(session.path("metadata"));
+        if (fromMetadata != null) {
+            return fromMetadata;
         }
 
         String clientReferenceId = text(session, "client_reference_id");
@@ -271,9 +395,15 @@ public class StripeWebhookService {
     }
 
     private UUID extractTrackingEventIdFromMetadata(JsonNode metadata) {
-        String metadataEventId = text(metadata, "eventId");
-        if (!isBlank(metadataEventId)) {
-            return parseUuid(metadataEventId);
+        String[] keys = {"eventId", "event_id", "client_reference_id", "tracking_event_id"};
+        for (String key : keys) {
+            String candidate = text(metadata, key);
+            if (!isBlank(candidate)) {
+                UUID parsed = parseUuid(candidate);
+                if (parsed != null) {
+                    return parsed;
+                }
+            }
         }
         return null;
     }
@@ -375,11 +505,105 @@ public class StripeWebhookService {
         return "SUCCEEDED".equalsIgnoreCase(status) || "PAID".equalsIgnoreCase(status);
     }
 
+    private String toBusinessStatus(String stripeStatus) {
+        if (isBlank(stripeStatus)) {
+            return "UNKNOWN";
+        }
+
+        String normalized = stripeStatus.toUpperCase(Locale.ROOT);
+        if ("SUCCEEDED".equals(normalized) || "PAID".equals(normalized)) {
+            return "SUCCESS";
+        }
+
+        if ("FAILED".equals(normalized)
+                || "CANCELED".equals(normalized)
+                || "CANCELLED".equals(normalized)
+                || "UNPAID".equals(normalized)
+                || "REQUIRES_PAYMENT_METHOD".equals(normalized)) {
+            return "FAILED";
+        }
+
+        if ("PROCESSING".equals(normalized)
+                || "REQUIRES_ACTION".equals(normalized)
+                || "REQUIRES_CONFIRMATION".equals(normalized)
+                || "REQUIRES_CAPTURE".equals(normalized)
+                || "PENDING".equals(normalized)
+                || "OPEN".equals(normalized)
+                || "UNKNOWN".equals(normalized)) {
+            return "PENDING";
+        }
+
+        return "UNKNOWN";
+    }
+
     private String coalesce(String current, String candidate) {
         if (current == null || current.isBlank()) {
             return candidate;
         }
         return current;
+    }
+
+    private boolean shouldDispatchSuccessfulPayment(boolean wasSuccessful, String newStatus, boolean gainedEventId) {
+        if (!isSuccessfulStatus(newStatus)) {
+            return false;
+        }
+        return !wasSuccessful || gainedEventId;
+    }
+
+    private void upsertStripeSessionId(OrderRecord order, String stripeSessionId, String paymentIntentId) {
+        if (isBlank(stripeSessionId)) {
+            return;
+        }
+        String current = order.getStripeSessionId();
+        if (isBlank(current) || current.equals(paymentIntentId)) {
+            order.setStripeSessionId(stripeSessionId);
+        }
+    }
+
+    private OrderRecord saveOrderResilient(OrderRecord candidate, String paymentIntentId, String stripeSessionId) {
+        try {
+            return orderRepository.upsert(candidate);
+        } catch (DataIntegrityViolationException ex) {
+            DataIntegrityViolationException effectiveException = ex;
+
+            if (candidate.getEventId() != null && isMissingTrackingSessionForeignKey(ex)) {
+                trackingService.ensureSessionExists(candidate.getEventId());
+                try {
+                    return orderRepository.upsert(candidate);
+                } catch (DataIntegrityViolationException retryEx) {
+                    effectiveException = retryEx;
+                }
+            }
+
+            if (!isBlank(paymentIntentId)) {
+                Optional<OrderRecord> byPaymentIntent = orderRepository.findByPaymentIntentId(paymentIntentId);
+                if (byPaymentIntent.isPresent()) {
+                    log.info("stripe_order concurrent_duplicate paymentIntentId={} stripeSessionId={}", paymentIntentId, stripeSessionId);
+                    return byPaymentIntent.get();
+                }
+            }
+
+            Optional<OrderRecord> bySession = orderRepository.findByStripeSessionId(stripeSessionId);
+            if (bySession.isPresent()) {
+                log.info("stripe_order concurrent_duplicate stripeSessionId={} paymentIntentId={}", stripeSessionId, paymentIntentId);
+                return bySession.get();
+            }
+            throw effectiveException;
+        }
+    }
+
+    private boolean isMissingTrackingSessionForeignKey(DataIntegrityViolationException ex) {
+        Throwable cursor = ex;
+        while (cursor != null) {
+            String message = cursor.getMessage();
+            if (message != null &&
+                    (message.contains("orders_event_id_fkey")
+                            || message.contains("is not present in table \"tracking_session\""))) {
+                return true;
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
     }
 
     private void processSuccessfulPayment(
@@ -390,14 +614,18 @@ public class StripeWebhookService {
             String customerEmail,
             String customerName
     ) {
-        if (orderRecord.getEventId() != null) {
-            trackingService.recordPurchaseEvent(
-                    orderRecord.getEventId(),
-                    orderRecord.getAmount(),
-                    orderRecord.getCurrency(),
-                    rawPayload
-            );
+        if (orderRecord.getEventId() == null) {
+            log.warn("stripe_order success_deferred_missing_event_id stripeSessionId={} paymentIntentId={}",
+                    orderRecord.getStripeSessionId(), orderRecord.getPaymentIntentId());
+            return;
         }
+
+        trackingService.recordPurchaseEvent(
+                orderRecord.getEventId(),
+                orderRecord.getAmount(),
+                orderRecord.getCurrency(),
+                rawPayload
+        );
 
         PurchaseIntegrationPayload integrationPayload = new PurchaseIntegrationPayload(
                 orderRecord.getEventId(),

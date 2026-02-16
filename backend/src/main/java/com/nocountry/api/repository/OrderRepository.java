@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface OrderRepository extends JpaRepository<OrderRecord, UUID> {
+public interface OrderRepository extends JpaRepository<OrderRecord, UUID>, OrderRepositoryCustom {
 
     boolean existsByStripeSessionId(String stripeSessionId);
 

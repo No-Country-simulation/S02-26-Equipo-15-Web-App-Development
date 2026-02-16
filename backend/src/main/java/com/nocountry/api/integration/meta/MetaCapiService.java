@@ -1,5 +1,7 @@
 package com.nocountry.api.integration.meta;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nocountry.api.config.AppProperties;
 import com.nocountry.api.integration.PurchaseIntegrationPayload;
 import com.nocountry.api.service.IntegrationLogService;
@@ -24,22 +26,26 @@ public class MetaCapiService {
     private final RestClient restClient;
     private final AppProperties appProperties;
     private final IntegrationLogService integrationLogService;
+    private final ObjectMapper objectMapper;
 
     public MetaCapiService(
             RestClient integrationRestClient,
             AppProperties appProperties,
-            IntegrationLogService integrationLogService
+            IntegrationLogService integrationLogService,
+            ObjectMapper objectMapper
     ) {
         this.restClient = integrationRestClient;
         this.appProperties = appProperties;
         this.integrationLogService = integrationLogService;
+        this.objectMapper = objectMapper;
     }
 
     public void sendPurchase(PurchaseIntegrationPayload payload) {
+        String referenceId = referenceId(payload);
         if (!appProperties.getIntegrations().isMetaCapiEnabled()) {
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "META_CAPI",
-                    payload.eventId(),
+                    referenceId,
                     "SKIPPED",
                     null,
                     null,
@@ -52,9 +58,9 @@ public class MetaCapiService {
 
         if (isBlank(appProperties.getMeta().getPixelId()) || isBlank(appProperties.getMeta().getAccessToken())) {
             log.warn("meta_capi skipped reason=missing_config eventId={}", payload.eventId());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "META_CAPI",
-                    payload.eventId(),
+                    referenceId,
                     "SKIPPED",
                     null,
                     null,
@@ -90,32 +96,32 @@ public class MetaCapiService {
 
             Map<String, Object> body = Map.of("data", List.of(event));
 
-            ResponseEntity<Void> response = restClient.post()
+            ResponseEntity<String> response = restClient.post()
                     .uri("https://graph.facebook.com/v18.0/{pixelId}/events?access_token={token}",
                             appProperties.getMeta().getPixelId(),
                             appProperties.getMeta().getAccessToken())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(body)
                     .retrieve()
-                    .toBodilessEntity();
+                    .toEntity(String.class);
             int latencyMs = elapsedMs(startNanos);
 
             log.info("meta_capi status=sent eventId={}", payload.eventId());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "META_CAPI",
-                    payload.eventId(),
+                    referenceId,
                     "SENT",
                     response.getStatusCode().value(),
                     latencyMs,
                     body,
-                    null,
+                    parseResponsePayload(response.getBody()),
                     null
             );
         } catch (RestClientResponseException ex) {
             log.warn("meta_capi status=failed eventId={} error={}", payload.eventId(), ex.getMessage());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "META_CAPI",
-                    payload.eventId(),
+                    referenceId,
                     "FAILED",
                     ex.getRawStatusCode(),
                     null,
@@ -125,9 +131,9 @@ public class MetaCapiService {
             );
         } catch (Exception ex) {
             log.warn("meta_capi status=failed eventId={} error={}", payload.eventId(), ex.getMessage());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "META_CAPI",
-                    payload.eventId(),
+                    referenceId,
                     "FAILED",
                     null,
                     null,
@@ -144,5 +150,27 @@ public class MetaCapiService {
 
     private int elapsedMs(long startNanos) {
         return (int) ((System.nanoTime() - startNanos) / 1_000_000L);
+    }
+
+    private Object parseResponsePayload(String responseBody) {
+        if (isBlank(responseBody)) {
+            return null;
+        }
+        try {
+            JsonNode json = objectMapper.readTree(responseBody);
+            if (json.isObject() || json.isArray()) {
+                return json;
+            }
+            return responseBody;
+        } catch (Exception ignored) {
+            return responseBody;
+        }
+    }
+
+    private String referenceId(PurchaseIntegrationPayload payload) {
+        if (payload.eventId() != null) {
+            return payload.eventId().toString();
+        }
+        return payload.stripeSessionId();
     }
 }

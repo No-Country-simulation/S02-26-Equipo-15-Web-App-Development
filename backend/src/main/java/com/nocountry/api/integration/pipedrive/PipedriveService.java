@@ -34,10 +34,11 @@ public class PipedriveService {
     }
 
     public void sendPurchase(PurchaseIntegrationPayload payload) {
+        String referenceId = referenceId(payload);
         if (!appProperties.getIntegrations().isPipedriveEnabled()) {
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "PIPEDRIVE",
-                    payload.eventId(),
+                    referenceId,
                     "SKIPPED",
                     null,
                     null,
@@ -50,9 +51,9 @@ public class PipedriveService {
 
         if (isBlank(appProperties.getPipedrive().getApiToken())) {
             log.warn("pipedrive skipped reason=missing_config eventId={}", payload.eventId());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "PIPEDRIVE",
-                    payload.eventId(),
+                    referenceId,
                     "SKIPPED",
                     null,
                     null,
@@ -71,9 +72,9 @@ public class PipedriveService {
             int latencyMs = elapsedMs(startNanos);
 
             log.info("pipedrive status=sent eventId={}", payload.eventId());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "PIPEDRIVE",
-                    payload.eventId(),
+                    referenceId,
                     "SENT",
                     200,
                     latencyMs,
@@ -87,9 +88,9 @@ public class PipedriveService {
             );
         } catch (RestClientResponseException ex) {
             log.warn("pipedrive status=failed eventId={} error={}", payload.eventId(), ex.getMessage());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "PIPEDRIVE",
-                    payload.eventId(),
+                    referenceId,
                     "FAILED",
                     ex.getRawStatusCode(),
                     null,
@@ -99,9 +100,9 @@ public class PipedriveService {
             );
         } catch (Exception ex) {
             log.warn("pipedrive status=failed eventId={} error={}", payload.eventId(), ex.getMessage());
-            integrationLogService.log(
+            integrationLogService.logWithReference(
                     "PIPEDRIVE",
-                    payload.eventId(),
+                    referenceId,
                     "FAILED",
                     null,
                     null,
@@ -245,5 +246,12 @@ public class PipedriveService {
 
     private int elapsedMs(long startNanos) {
         return (int) ((System.nanoTime() - startNanos) / 1_000_000L);
+    }
+
+    private String referenceId(PurchaseIntegrationPayload payload) {
+        if (payload.eventId() != null) {
+            return payload.eventId().toString();
+        }
+        return payload.stripeSessionId();
     }
 }

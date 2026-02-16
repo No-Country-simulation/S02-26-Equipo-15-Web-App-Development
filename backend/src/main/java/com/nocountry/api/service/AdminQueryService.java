@@ -69,7 +69,7 @@ public class AdminQueryService {
                 """, this::mapEvent, eventId);
 
         List<OrderDto> orders = jdbcTemplate.query("""
-                SELECT id, event_id, stripe_session_id, payment_intent_id, amount, currency, status, created_at
+                SELECT id, event_id, stripe_session_id, payment_intent_id, amount, currency, status, business_status, created_at
                 FROM orders
                 WHERE event_id = ?
                 ORDER BY created_at DESC
@@ -177,6 +177,7 @@ public class AdminQueryService {
                 rs.getBigDecimal("amount"),
                 rs.getString("currency"),
                 rs.getString("status"),
+                rs.getString("business_status"),
                 toInstant(rs, "created_at")
         );
     }
