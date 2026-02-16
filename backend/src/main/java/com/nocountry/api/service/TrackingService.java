@@ -117,6 +117,25 @@ public class TrackingService {
         log.info("track_event eventId={} eventType=purchase", eventId);
     }
 
+    @Transactional
+    public void ensureSessionExists(UUID eventId) {
+        if (eventId == null) {
+            return;
+        }
+
+        Instant now = Instant.now(clock);
+        TrackingSession session = trackingSessionRepository.findById(eventId)
+                .orElseGet(() -> {
+                    TrackingSession s = new TrackingSession();
+                    s.setEventId(eventId);
+                    s.setCreatedAt(now);
+                    s.setLastSeenAt(now);
+                    return s;
+                });
+        session.setLastSeenAt(now);
+        savePurchaseSessionWithRetry(session, eventId, now);
+    }
+
     private TrackingSession newSession(UUID eventId, Instant now, TrackRequest request, RequestMetadata metadata) {
         TrackingSession session = new TrackingSession();
         session.setEventId(eventId);

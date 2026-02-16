@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "stripe_webhook_event")
@@ -26,6 +27,9 @@ public class StripeWebhookEvent {
 
     @Column(name = "error", columnDefinition = "TEXT")
     private String error;
+
+    @Column(name = "event_id")
+    private UUID eventId;
 
     public String getStripeEventId() {
         return stripeEventId;
@@ -65,5 +69,13 @@ public class StripeWebhookEvent {
 
     public void setError(String error) {
         this.error = error;
+    }
+
+    public UUID getEventId() {
+        return eventId;
+    }
+
+    public void setEventId(UUID eventId) {
+        this.eventId = eventId;
     }
 }

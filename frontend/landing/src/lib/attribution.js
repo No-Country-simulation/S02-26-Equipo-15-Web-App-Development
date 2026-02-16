@@ -64,6 +64,12 @@ export function ensureEventId() {
   return next;
 }
 
+export function rotateEventId() {
+  const next = generateEventId();
+  safeSet(EVENT_ID_KEY, next);
+  return next;
+}
+
 export function readAttribution() {
   if (typeof window === 'undefined') return null;
 

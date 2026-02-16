@@ -12,6 +12,7 @@ public record OrderDto(
         BigDecimal amount,
         String currency,
         String status,
+        String businessStatus,
         Instant createdAt
 ) {
 }

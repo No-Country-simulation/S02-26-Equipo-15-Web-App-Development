@@ -1,0 +1,23 @@
+ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS business_status VARCHAR(32);
+
+UPDATE orders
+SET business_status = CASE
+    WHEN UPPER(COALESCE(status, '')) IN ('PAID', 'SUCCEEDED') THEN 'SUCCESS'
+    WHEN UPPER(COALESCE(status, '')) IN ('FAILED', 'CANCELED', 'CANCELLED', 'UNPAID', 'REQUIRES_PAYMENT_METHOD') THEN 'FAILED'
+    WHEN UPPER(COALESCE(status, '')) IN ('PROCESSING', 'REQUIRES_ACTION', 'REQUIRES_CONFIRMATION', 'REQUIRES_CAPTURE', 'PENDING', 'OPEN', 'UNKNOWN') THEN 'PENDING'
+    ELSE 'UNKNOWN'
+END
+WHERE business_status IS NULL;
+
+ALTER TABLE orders
+    ALTER COLUMN business_status SET DEFAULT 'UNKNOWN';
+
+UPDATE orders
+SET business_status = 'UNKNOWN'
+WHERE business_status IS NULL;
+
+ALTER TABLE orders
+    ALTER COLUMN business_status SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_business_status ON orders(business_status);

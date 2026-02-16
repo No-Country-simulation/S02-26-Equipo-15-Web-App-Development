@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
-import { ensureEventId, readAttribution } from './lib/attribution';
+import { ensureEventId, readAttribution, rotateEventId } from './lib/attribution';
 import { trackBeginCheckout, trackCTA } from './lib/tracking/events';
 import { redirectToStripe } from './lib/stripe';
 import { apiFetch } from './config/api';
@@ -15,7 +15,7 @@ function App() {
     const attribution = readAttribution();
     setTrackingData(attribution);
 
-    const localEventId = ensureEventId();
+    const localEventId = rotateEventId();
     setEventId(localEventId);
 
     const payload = {

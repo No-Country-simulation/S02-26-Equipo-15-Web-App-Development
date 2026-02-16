@@ -53,6 +53,7 @@ app:
   ga4:
     measurement-id: ${GA4_MEASUREMENT_ID:}
     api-secret: ${GA4_API_SECRET:}
+    debug-validation-enabled: ${GA4_MP_DEBUG_VALIDATION_ENABLED:false}
   pipedrive:
     api-token: ${PIPEDRIVE_API_TOKEN:}
   cors:
