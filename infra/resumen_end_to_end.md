@@ -1,28 +1,32 @@
-﻿# Resumen End-to-End (Actualizado)
+# Resumen End-to-End (Actualizado)
 
-## 1. Objetivo
-Conectar adquisicion (ads), tracking y conversion de pago en un flujo unico con correlacion por `eventId`, persistencia en PostgreSQL e integraciones server-side.
+## 1) Objetivo
 
-## 2. Flujo principal implementado
-1. La Landing envia `POST /api/track` con `eventType`, UTMs, `gclid/fbclid`, `landing_path` y `eventId` opcional.
+Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId`, persistencia en PostgreSQL e integraciones server-side auditables.
+
+## 2) Flujo principal implementado
+
+1. Landing genera `eventId` nuevo por carga y envia `POST /api/track`.
 2. Backend:
-   - genera `eventId` si no viene,
-   - hace upsert de `tracking_session` (first-touch, sin sobreescribir UTMs iniciales),
-   - inserta `tracking_event` idempotente,
-   - devuelve exactamente `{ "eventId": "<uuid>" }`.
-3. Usuario paga en Stripe Checkout.
-4. Stripe envia webhook a `POST /api/stripe/webhook`.
-5. Backend valida firma y procesa idempotente:
-   - registra estado en `stripe_webhook_event`,
-   - crea/actualiza `orders` sin duplicar por `stripe_session_id`,
-   - registra `purchase` en `tracking_event` cuando corresponde.
-6. Backend dispara integraciones server-side (segun flags):
-   - Meta CAPI,
-   - GA4 Measurement Protocol,
-   - Pipedrive (opcional).
-7. Resultado de cada integracion queda en `integrations_log`.
+   - acepta `eventId` opcional,
+   - genera UUID si no viene,
+   - upsert `tracking_session` (first-touch),
+   - insert `tracking_event` idempotente,
+   - responde `{ "eventId": "<uuid>" }`.
+3. Landing redirige a Stripe con `client_reference_id=<eventId>`.
+4. Stripe envia webhooks (`payment_intent.succeeded`, `checkout.session.completed`).
+5. Backend valida firma, procesa idempotente y persiste:
+   - `stripe_webhook_event` (ahora con `event_id`)
+   - `orders` (sin duplicar)
+   - `tracking_event` `purchase`
+6. Backend dispara integraciones (segun flags):
+   - `META_CAPI`
+   - `GA4_MP`
+   - `PIPEDRIVE`
+7. Resultado por integracion queda en `integrations_log`.
 
-## 3. Endpoints activos
+## 3) Endpoints activos
+
 - `POST /api/track`
 - `POST /api/stripe/webhook`
 - `GET /api/admin/sessions`
@@ -32,7 +36,10 @@ Conectar adquisicion (ads), tracking y conversion de pago en un flujo unico con 
 - `GET /api/health/db`
 - `GET /actuator/health`
 
-## 4. Flags y configuracion
+Nota: los endpoints admin ya existen en backend, pero el frontend `frontend/admin/` sigue pendiente de desarrollo.
+
+## 4) Flags y config
+
 - `TRACKING_ENABLED`
 - `META_CAPI_ENABLED`
 - `GA4_MP_ENABLED`
@@ -43,30 +50,106 @@ Conectar adquisicion (ads), tracking y conversion de pago en un flujo unico con 
 - `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
-## 5. Donde validar exito/falla por tramo
-- **API Track**: tabla `tracking_session` y `tracking_event`.
-- **Webhook Stripe**: tabla `stripe_webhook_event`.
-  - `PROCESSED`: webhook valido y procesado.
-  - `FAILED`: revisar columna `error` (ej. `Invalid Stripe signature`).
-- **Registro de pago**: tabla `orders`.
-- **Meta/GA4/Pipedrive server-side**: tabla `integrations_log`.
-  - `SENT`: envio exitoso.
-  - `FAILED`: error y status HTTP cuando exista.
-  - `SKIPPED`: integracion deshabilitada o sin credenciales.
+## 5) Donde validar por tramo
 
-## 6. Nota importante sobre GA4(client) y Meta Pixel(client)
-El backend **no puede confirmar** directamente los eventos client-side (`GA4 client` y `Meta Pixel client`) porque salen del navegador. Esos se validan en:
-- GA4 DebugView / Reportes,
-- Meta Events Manager.
+- API track: `tracking_session`, `tracking_event`
+- Stripe webhook: `stripe_webhook_event`
+- Orden de pago: `orders`
+- Integraciones server-side: `integrations_log`
 
-La parte server-side si queda trazada en `integrations_log`.
+Interpretacion de `integrations_log.status`:
 
-## 7. Limpieza de esquema aplicada
-- Se agrego migracion Flyway `V4__drop_legacy_tables.sql`.
-- Se removieron tablas legadas: `users`, `attributions`, `landing_events`, `payments`.
-- Desde esta migracion, el backend opera con un unico modelo activo:
-  - `tracking_session`
-  - `tracking_event`
-  - `orders`
-  - `stripe_webhook_event`
-  - `integrations_log`
+- `SENT`: envio aceptado
+- `SENT_WITH_WARNINGS`: aceptado con warnings (GA4 debug)
+- `FAILED`: error de envio
+- `SKIPPED`: deshabilitado o falta config
+
+## 6) Notas clave de trazabilidad
+
+- Es normal ver 2 filas en `stripe_webhook_event` para un mismo `event_id`:
+  son 2 eventos Stripe distintos del mismo pago.
+- Es normal ver `PAID` y `SUCCEEDED` en `orders.status`.
+  El estado canonico para negocio es `orders.business_status`.
+- En Meta CAPI, `response_payload` ya guarda respuesta (ej. `events_received`, `fbtrace_id`).
+- En GA4 MP, `transaction_id` corresponde a `stripe_session_id`.
+
+## 7) Auditoria en una sola consulta
+
+```sql
+WITH target AS (
+  SELECT 'TU_EVENT_ID'::uuid AS event_id
+)
+SELECT
+  'tracking_session' AS section,
+  ts.event_id::text AS ref_1,
+  NULL::text AS ref_2,
+  NULL::text AS status,
+  ts.created_at AS ts,
+  NULL::text AS detail
+FROM tracking_session ts
+JOIN target t ON ts.event_id = t.event_id
+
+UNION ALL
+
+SELECT
+  'tracking_event' AS section,
+  te.event_id::text AS ref_1,
+  te.event_type AS ref_2,
+  COALESCE(te.currency, '') AS status,
+  te.created_at AS ts,
+  COALESCE(te.value::text, '') AS detail
+FROM tracking_event te
+JOIN target t ON te.event_id = t.event_id
+
+UNION ALL
+
+SELECT
+  'orders' AS section,
+  o.event_id::text AS ref_1,
+  COALESCE(o.payment_intent_id, o.stripe_session_id) AS ref_2,
+  COALESCE(o.business_status, o.status) AS status,
+  o.created_at AS ts,
+  'stripe_session=' || COALESCE(o.stripe_session_id, '') AS detail
+FROM orders o
+JOIN target t ON o.event_id = t.event_id
+
+UNION ALL
+
+SELECT
+  'ga4_mp' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'GA4_MP'
+
+UNION ALL
+
+SELECT
+  'meta_capi' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'META_CAPI'
+
+UNION ALL
+
+SELECT
+  'stripe_webhook_event' AS section,
+  swe.event_id::text AS ref_1,
+  swe.stripe_event_id AS ref_2,
+  swe.status AS status,
+  swe.received_at AS ts,
+  COALESCE(swe.error, '') AS detail
+FROM stripe_webhook_event swe
+JOIN target t ON swe.event_id = t.event_id
+
+ORDER BY ts DESC;
+```
