@@ -21,17 +21,19 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        List<String> allowedOrigins = appProperties.getCors().getAllowedOrigins();
+        List<String> allowedOriginPatterns = appProperties.getCors().getAllowedOrigins();
         boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
 
-        if (isProd && allowedOrigins.stream().anyMatch("*"::equals)) {
+        if (isProd && allowedOriginPatterns.stream().anyMatch("*"::equals)) {
             throw new IllegalStateException("CORS wildcard '*' is not allowed in prod profile");
         }
 
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins.toArray(String[]::new))
-                .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("*")
+                .allowedOriginPatterns(allowedOriginPatterns.toArray(String[]::new))
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin")
+                .exposedHeaders("Location", "Authorization")
+                .maxAge(3600)
                 .allowCredentials(false);
     }
 }
