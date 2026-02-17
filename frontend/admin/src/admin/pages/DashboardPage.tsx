@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 
 import { KpiCard } from '@/admin/components/dashboard/KpiCard'
+import { ChartCard } from '@/admin/components/dashboard/ChartCard'
 import { EmptyState } from '@/admin/components/common/EmptyState'
 import { ErrorAlert } from '@/admin/components/common/ErrorAlert'
 import { KpiSkeletonGrid } from '@/admin/components/common/Skeletons'
@@ -22,6 +23,7 @@ import { StatusChip } from '@/admin/components/common/StatusChip'
 import { DateRangeFilter } from '@/admin/components/common/DateRangeFilter'
 import { PageHeader } from '@/admin/components/layout/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/admin/components/ui/card'
+import { useDebouncedValue } from '@/admin/hooks/useDebouncedValue'
 import { useDashboardStats } from '@/admin/hooks/useDashboardStats'
 import { normalizeHttpError } from '@/admin/services/apiClient'
 import { formatCurrency } from '@/lib/utils'
@@ -39,10 +41,12 @@ function toIso(value: string) {
 export function DashboardPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const debouncedFrom = useDebouncedValue(from, 450)
+  const debouncedTo = useDebouncedValue(to, 450)
 
   const query = useDashboardStats({
-    from: toIso(from),
-    to: toIso(to),
+    from: toIso(debouncedFrom),
+    to: toIso(debouncedTo),
   })
 
   const chartData = query.data?.ordersByStatus ?? []
@@ -90,70 +94,69 @@ export function DashboardPage() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-3">
-            <Card className="xl:col-span-2">
-              <CardHeader>
-                <CardTitle>Revenue diario</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                {revenueData.length === 0 ? (
-                  <EmptyState
-                    title="Sin revenue en el rango seleccionado"
-                    description="Ajusta el rango de fechas para visualizar ingresos."
-                  />
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis dataKey="date" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
-                      <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
-                      <Line type="monotone" dataKey="revenue" stroke="#22d3ee" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+            <ChartCard
+              title="Revenue diario"
+              className="xl:col-span-2"
+              chartClassName="h-[300px] min-h-[280px]"
+              isLoading={query.isPending}
+              hasData={revenueData.length > 0}
+              emptyState={
+                <EmptyState
+                  title="Sin revenue en el rango seleccionado"
+                  description="Ajusta el rango de fechas para visualizar ingresos."
+                />
+              }
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="date" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                  <Line type="monotone" dataKey="revenue" stroke="#22d3ee" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribucion business_status</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[300px]">
-                {chartData.length === 0 ? (
-                  <EmptyState title="Sin ordenes" description="Aun no hay ordenes en el periodo seleccionado." />
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={chartData} dataKey="total" nameKey="status" innerRadius={50} outerRadius={90}>
-                        {chartData.map((entry, index) => (
-                          <Cell key={entry.status} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+            <ChartCard
+              title="Distribucion business_status"
+              chartClassName="h-[300px] min-h-[280px]"
+              isLoading={query.isPending}
+              hasData={chartData.length > 0}
+              emptyState={<EmptyState title="Sin ordenes" description="Aun no hay ordenes en el periodo seleccionado." />}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={chartData} dataKey="total" nameKey="status" innerRadius={50} outerRadius={90}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={entry.status} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-3">
-            <Card className="xl:col-span-2">
-              <CardHeader>
-                <CardTitle>Ordenes SUCCESS vs FAILED</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={summaryBars}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#94a3b8" />
-                    <YAxis stroke="#94a3b8" />
-                    <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
-                    <Bar dataKey="value" fill="#22d3ee" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            <ChartCard
+              title="Ordenes SUCCESS vs FAILED"
+              className="xl:col-span-2"
+              chartClassName="h-[280px] min-h-[260px]"
+              isLoading={query.isPending}
+              hasData={summaryBars.some((item) => item.value > 0)}
+              emptyState={<EmptyState title="Sin ordenes" description="No hay suficientes datos para comparar estados." />}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={summaryBars}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                  <Bar dataKey="value" fill="#22d3ee" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
             <Card>
               <CardHeader>
                 <CardTitle>Leyenda de estados</CardTitle>

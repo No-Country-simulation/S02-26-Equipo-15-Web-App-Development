@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 
@@ -12,6 +12,7 @@ import { Button } from '@/admin/components/ui/button'
 import { Input } from '@/admin/components/ui/input'
 import { Select } from '@/admin/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/admin/components/ui/table'
+import { useDebouncedValue } from '@/admin/hooks/useDebouncedValue'
 import { useSessionsTableData } from '@/admin/hooks/useSessionsTableData'
 import { normalizeHttpError } from '@/admin/services/apiClient'
 import type { SessionTableRow } from '@/admin/types/api'
@@ -75,26 +76,55 @@ function toIso(value: string) {
 }
 
 export function SessionsPage() {
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [businessStatus, setBusinessStatus] = useState('ALL')
   const [offset, setOffset] = useState(0)
+  const debouncedSearch = useDebouncedValue(searchInput, 350)
+  const deferredSearch = useDeferredValue(debouncedSearch)
+  const debouncedFrom = useDebouncedValue(from, 450)
+  const debouncedTo = useDebouncedValue(to, 450)
+  const normalizedSearch = deferredSearch.trim().toLowerCase()
 
   const { sessionsQuery, rows, isLoadingDetails } = useSessionsTableData({
-    from: toIso(from),
-    to: toIso(to),
+    from: toIso(debouncedFrom),
+    to: toIso(debouncedTo),
     limit: PAGE_SIZE,
     offset,
   })
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
-      const matchesSearch = row.eventId.toLowerCase().includes(search.toLowerCase())
+      const matchesSearch = row.eventId.toLowerCase().includes(normalizedSearch)
       const matchesStatus = businessStatus === 'ALL' ? true : row.businessStatus === businessStatus
       return matchesSearch && matchesStatus
     })
-  }, [businessStatus, rows, search])
+  }, [businessStatus, normalizedSearch, rows])
+
+  const handlePreviousPage = useCallback(() => {
+    setOffset((current) => Math.max(current - PAGE_SIZE, 0))
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setOffset((current) => current + PAGE_SIZE)
+  }, [])
+
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(event.target.value)
+  }, [])
+
+  const handleBusinessStatusChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setBusinessStatus(event.target.value)
+  }, [])
+
+  const handleClearFilters = useCallback(() => {
+    setSearchInput('')
+    setFrom('')
+    setTo('')
+    setBusinessStatus('ALL')
+    setOffset(0)
+  }, [])
 
   const table = useReactTable({
     data: filteredRows,
@@ -114,16 +144,14 @@ export function SessionsPage() {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                setOffset((current) => Math.max(current - PAGE_SIZE, 0))
-              }}
+              onClick={handlePreviousPage}
               disabled={offset === 0}
             >
               Anterior
             </Button>
             <Button
               variant="outline"
-              onClick={() => setOffset((current) => current + PAGE_SIZE)}
+              onClick={handleNextPage}
               disabled={!hasNext}
             >
               Siguiente
@@ -135,27 +163,18 @@ export function SessionsPage() {
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
         <Input
           placeholder="Buscar por eventId..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          value={searchInput}
+          onChange={handleSearchChange}
         />
         <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-        <Select value={businessStatus} onChange={(event) => setBusinessStatus(event.target.value)}>
+        <Select value={businessStatus} onChange={handleBusinessStatusChange}>
           <option value="ALL">Todos los estados</option>
           <option value="SUCCESS">SUCCESS</option>
           <option value="FAILED">FAILED</option>
           <option value="PENDING">PENDING</option>
           <option value="UNKNOWN">UNKNOWN</option>
         </Select>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setSearch('')
-            setFrom('')
-            setTo('')
-            setBusinessStatus('ALL')
-            setOffset(0)
-          }}
-        >
+        <Button variant="secondary" onClick={handleClearFilters}>
           Limpiar filtros
         </Button>
       </div>

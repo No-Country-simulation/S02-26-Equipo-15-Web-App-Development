@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 
 import { eventsService } from '@/admin/services/eventsService'
 import { sessionsService } from '@/admin/services/sessionsService'
 import type { EventsParams, EventsTableRow, SessionSummary } from '@/admin/types/api'
+import { mapWithConcurrency } from '@/lib/utils'
 
 const SESSION_LOOKUP_LIMIT = 500
+const EVENT_DETAILS_CONCURRENCY = 4
 
 export function useEventsTableData(params: EventsParams) {
   const eventsQuery = useQuery({
@@ -30,12 +32,16 @@ export function useEventsTableData(params: EventsParams) {
     return [...new Set((eventsQuery.data?.items ?? []).map((item) => item.eventId))]
   }, [eventsQuery.data?.items])
 
-  const detailQueries = useQueries({
-    queries: eventIds.map((eventId) => ({
-      queryKey: ['event-session-detail-for-events', eventId],
-      queryFn: () => sessionsService.getSessionDetail(eventId),
-      staleTime: 30_000,
-    })),
+  const detailLookupQuery = useQuery({
+    queryKey: ['event-session-detail-for-events', eventIds],
+    queryFn: async () =>
+      mapWithConcurrency(
+        eventIds,
+        EVENT_DETAILS_CONCURRENCY,
+        async (eventId) => sessionsService.getSessionDetail(eventId).catch(() => null),
+      ),
+    enabled: eventIds.length > 0,
+    staleTime: 30_000,
   })
 
   const rows = useMemo<EventsTableRow[]>(() => {
@@ -44,9 +50,10 @@ export function useEventsTableData(params: EventsParams) {
       sessionLookup.set(session.eventId, session)
     }
 
+    const details = detailLookupQuery.data ?? []
     const orderLookup = new Map<string, string | null>()
     for (let index = 0; index < eventIds.length; index += 1) {
-      const detail = detailQueries[index]?.data
+      const detail = details[index]
       orderLookup.set(eventIds[index], detail?.orders?.[0]?.id ?? null)
     }
 
@@ -63,9 +70,9 @@ export function useEventsTableData(params: EventsParams) {
         orderId: orderLookup.get(event.eventId) ?? null,
       }
     })
-  }, [detailQueries, eventIds, eventsQuery.data?.items, sessionsQuery.data?.items])
+  }, [detailLookupQuery.data, eventIds, eventsQuery.data?.items, sessionsQuery.data?.items])
 
-  const isLoadingDetails = detailQueries.some((query) => query.isPending)
+  const isLoadingDetails = detailLookupQuery.isPending
 
   return {
     eventsQuery,
