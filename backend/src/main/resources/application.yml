@@ -11,9 +11,17 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
     password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:postgres}}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 1
-      connection-timeout: 30000
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:6}
+      minimum-idle: ${DB_POOL_MIN_IDLE:0}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:180000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:240000}
+      keepalive-time: ${DB_KEEPALIVE_TIME_MS:120000}
+      data-source-properties:
+        tcpKeepAlive: true
+        connectTimeout: 10
+        socketTimeout: 30
   jpa:
     open-in-view: false
     hibernate:

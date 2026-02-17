@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(34, 211, 238, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(59, 130, 246, 0.12), transparent 35%),
+    #050816;
+  color: #e5edf9;
+}
+
+#root {
+  min-height: 100vh;
+}

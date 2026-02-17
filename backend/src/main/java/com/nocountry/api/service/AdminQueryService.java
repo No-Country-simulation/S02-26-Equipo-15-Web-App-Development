@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -130,11 +131,11 @@ public class AdminQueryService {
     private void appendTimeRange(StringBuilder sql, List<Object> args, Instant from, Instant to, String column) {
         if (from != null) {
             sql.append(" AND ").append(column).append(" >= ?");
-            args.add(from);
+            args.add(Timestamp.from(from));
         }
         if (to != null) {
             sql.append(" AND ").append(column).append(" <= ?");
-            args.add(to);
+            args.add(Timestamp.from(to));
         }
     }
 
