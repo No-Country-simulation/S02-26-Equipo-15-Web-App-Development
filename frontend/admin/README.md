@@ -50,6 +50,13 @@ npm run build
 npm run preview
 ```
 
+## Deploy en Vercel
+
+- Root Directory del proyecto en Vercel: `frontend/admin`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Este directorio incluye `vercel.json` con rewrites para SPA (`/admin` y `/admin/*` -> `/index.html`), evitando 404 al entrar por URL directa.
+
 ## Credenciales demo login
 
 - Usuario: no requerido
