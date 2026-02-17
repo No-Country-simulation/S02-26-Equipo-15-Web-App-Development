@@ -14,7 +14,7 @@ function toFiniteNumber(value: unknown, fallback: number) {
 
 function invalidResponseError(endpoint: string) {
   return new Error(
-    `Respuesta invalida en ${endpoint}. Verifica VITE_API_URL o el proxy de Vite para /api.`,
+    `Respuesta invalida en ${endpoint}. Verifica VITE_API_URL y la disponibilidad del backend.`,
   )
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useState, type ChangeEvent } from 'react'
 import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 
 import { DateRangeFilter } from '@/admin/components/common/DateRangeFilter'
@@ -10,6 +10,7 @@ import { Button } from '@/admin/components/ui/button'
 import { Input } from '@/admin/components/ui/input'
 import { Select } from '@/admin/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/admin/components/ui/table'
+import { useDebouncedValue } from '@/admin/hooks/useDebouncedValue'
 import { useEventsTableData } from '@/admin/hooks/useEventsTableData'
 import { normalizeHttpError } from '@/admin/services/apiClient'
 import type { EventsTableRow } from '@/admin/types/api'
@@ -51,24 +52,53 @@ function toIso(value: string) {
 }
 
 export function EventsPage() {
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [eventType, setEventType] = useState('')
   const [offset, setOffset] = useState(0)
+  const debouncedSearch = useDebouncedValue(searchInput, 350)
+  const deferredSearch = useDeferredValue(debouncedSearch)
+  const debouncedFrom = useDebouncedValue(from, 450)
+  const debouncedTo = useDebouncedValue(to, 450)
+  const normalizedSearch = deferredSearch.trim().toLowerCase()
 
   const { eventsQuery, rows, isLoadingDetails } = useEventsTableData({
-    from: toIso(from),
-    to: toIso(to),
+    from: toIso(debouncedFrom),
+    to: toIso(debouncedTo),
     eventType: eventType || undefined,
     limit: PAGE_SIZE,
     offset,
   })
 
   const filteredRows = useMemo(
-    () => rows.filter((row) => row.eventId.toLowerCase().includes(search.toLowerCase())),
-    [rows, search],
+    () => rows.filter((row) => row.eventId.toLowerCase().includes(normalizedSearch)),
+    [normalizedSearch, rows],
   )
+
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(event.target.value)
+  }, [])
+
+  const handleEventTypeChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setEventType(event.target.value)
+  }, [])
+
+  const handlePreviousPage = useCallback(() => {
+    setOffset((current) => Math.max(current - PAGE_SIZE, 0))
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setOffset((current) => current + PAGE_SIZE)
+  }, [])
+
+  const handleClearFilters = useCallback(() => {
+    setSearchInput('')
+    setFrom('')
+    setTo('')
+    setEventType('')
+    setOffset(0)
+  }, [])
 
   const table = useReactTable({
     data: filteredRows,
@@ -86,10 +116,10 @@ export function EventsPage() {
         description="Eventos de tracking con enrichment de atribucion por eventId"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setOffset((current) => Math.max(current - PAGE_SIZE, 0))} disabled={offset === 0}>
+            <Button variant="outline" onClick={handlePreviousPage} disabled={offset === 0}>
               Anterior
             </Button>
-            <Button variant="outline" onClick={() => setOffset((current) => current + PAGE_SIZE)} disabled={!hasNext}>
+            <Button variant="outline" onClick={handleNextPage} disabled={!hasNext}>
               Siguiente
             </Button>
           </div>
@@ -99,27 +129,18 @@ export function EventsPage() {
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
         <Input
           placeholder="Buscar eventId..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          value={searchInput}
+          onChange={handleSearchChange}
         />
         <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-        <Select value={eventType} onChange={(event) => setEventType(event.target.value)}>
+        <Select value={eventType} onChange={handleEventTypeChange}>
           <option value="">Todos los tipos</option>
           <option value="landing_view">landing_view</option>
           <option value="click_cta">click_cta</option>
           <option value="begin_checkout">begin_checkout</option>
           <option value="purchase">purchase</option>
         </Select>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setSearch('')
-            setFrom('')
-            setTo('')
-            setEventType('')
-            setOffset(0)
-          }}
-        >
+        <Button variant="secondary" onClick={handleClearFilters}>
           Limpiar filtros
         </Button>
       </div>
