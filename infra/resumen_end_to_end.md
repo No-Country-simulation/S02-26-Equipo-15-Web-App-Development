@@ -1,8 +1,18 @@
 # Resumen End-to-End (Actualizado)
 
+## 0) Contexto de negocio
+
+Se busca mejorar conversion de trafico pago (Google/Meta) hacia compra en Stripe para un servicio de incorporacion, impuestos y bookkeeping en EE.UU.
+
+Valor esperado de este flujo:
+
+- atribucion confiable de compra por canal/campana,
+- visibilidad del funnel completo en admin,
+- capacidad de optimizar inversion en ads en base a conversion real.
+
 ## 1) Objetivo
 
-Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId`, persistencia en PostgreSQL e integraciones server-side auditables.
+Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId`, persistencia en PostgreSQL, medicion en Google/Meta y monitoreo operativo desde panel admin.
 
 ## 2) Flujo principal implementado
 
@@ -13,17 +23,21 @@ Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId
    - upsert `tracking_session` (first-touch),
    - insert `tracking_event` idempotente,
    - responde `{ "eventId": "<uuid>" }`.
-3. Landing redirige a Stripe con `client_reference_id=<eventId>`.
-4. Stripe envia webhooks (`payment_intent.succeeded`, `checkout.session.completed`).
-5. Backend valida firma, procesa idempotente y persiste:
+3. Landing dispara eventos client-side:
+   - Google Analytics 4 (`page_view`, `click_cta`, `begin_checkout`)
+   - Meta Pixel (`PageView`, `ClickCTA`, `InitiateCheckout`)
+4. Landing redirige a Stripe con `client_reference_id=<eventId>`.
+5. Stripe envia webhooks (`payment_intent.succeeded`, `checkout.session.completed`).
+6. Backend valida firma, procesa idempotente y persiste:
    - `stripe_webhook_event` (ahora con `event_id`)
    - `orders` (sin duplicar)
    - `tracking_event` `purchase`
-6. Backend dispara integraciones (segun flags):
+7. Backend dispara integraciones server-side (segun flags):
+   - `GA4_MP` (Google Analytics 4 MP)
    - `META_CAPI`
-   - `GA4_MP`
    - `PIPEDRIVE`
-7. Resultado por integracion queda en `integrations_log`.
+8. Resultado por integracion queda en `integrations_log`.
+9. Admin consulta `sessions/events/metrics` via `GET /api/admin/*`.
 
 ## 3) Endpoints activos
 
@@ -36,7 +50,7 @@ Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId
 - `GET /api/health/db`
 - `GET /actuator/health`
 
-Nota: los endpoints admin ya existen en backend, pero el frontend `frontend/admin/` sigue pendiente de desarrollo.
+Nota: los endpoints admin en backend y el frontend `frontend/admin/` estan implementados y operativos.
 
 ## 4) Flags y config
 
@@ -59,10 +73,10 @@ Nota: los endpoints admin ya existen en backend, pero el frontend `frontend/admi
 
 Interpretacion de `integrations_log.status`:
 
-- `SENT`: envio aceptado
-- `SENT_WITH_WARNINGS`: aceptado con warnings (GA4 debug)
-- `FAILED`: error de envio
-- `SKIPPED`: deshabilitado o falta config
+- `SENT`: envio aceptado.
+- `SENT_WITH_WARNINGS`: aceptado con warnings (GA4 debug).
+- `FAILED`: error de envio.
+- `SKIPPED`: deshabilitado o falta config.
 
 ## 6) Notas clave de trazabilidad
 
@@ -74,6 +88,25 @@ Interpretacion de `integrations_log.status`:
 - En GA4 MP, `transaction_id` corresponde a `stripe_session_id`.
 
 ## 7) Auditoria en una sola consulta
+
+Esta consulta consolida en una sola salida toda la traza de un `eventId`:
+
+- sesion (`tracking_session`)
+- eventos de tracking (`tracking_event`)
+- orden de pago (`orders`)
+- envios server-side (`integrations_log` para `GA4_MP` y `META_CAPI`)
+- estado de webhooks (`stripe_webhook_event`)
+
+Que va a desplegar:
+
+- `section`: origen de la fila (tabla o integracion).
+- `ref_1`: referencia principal (normalmente `event_id` o `reference_id`).
+- `ref_2`: referencia secundaria (ej. `event_type`, `payment_intent_id`, `stripe_event_id`, HTTP status).
+- `status`: estado funcional del tramo (`business_status`, estado de integracion o webhook).
+- `ts`: timestamp del registro.
+- `detail`: detalle adicional (errores o datos de apoyo).
+
+El resultado sale ordenado por `ts DESC`, por lo que primero ves lo mas reciente del caso auditado.
 
 ```sql
 WITH target AS (
@@ -153,3 +186,29 @@ JOIN target t ON swe.event_id = t.event_id
 
 ORDER BY ts DESC;
 ```
+
+Lectura rapida esperada en un flujo exitoso:
+
+1. Filas de `tracking_session` y `tracking_event` (landing/cta/checkout).
+2. Fila de `orders` con estado de negocio `SUCCESS`.
+3. Filas en `ga4_mp` y/o `meta_capi` con `status` `SENT` o `SENT_WITH_WARNINGS`.
+4. Filas de `stripe_webhook_event` con `status` `PROCESSED`.
+
+## 8) Validacion del objetivo del proyecto
+
+Estado general: `cumplido a nivel MVP funcional`.
+
+Cumplido:
+
+- Tracking de funnel y attribution en landing.
+- Correlacion completa por `eventId` entre landing, pago y backend.
+- Conteo y registro de compras con deduplicacion de webhooks/ordenes.
+- Integraciones activables para Google Analytics 4 MP y Meta CAPI con auditoria.
+- Dashboard admin operativo para seguimiento de sesiones, eventos y metricas.
+
+Pendiente para cierre productivo:
+
+- Autenticacion/autorizacion robusta en admin.
+- Pruebas E2E y de carga para escenarios de concurrencia.
+- Observabilidad (alertas, dashboards, SLOs y manejo de incidentes).
+- Checklist operativo de despliegue y rollback.
