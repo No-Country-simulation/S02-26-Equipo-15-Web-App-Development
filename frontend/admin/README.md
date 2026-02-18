@@ -25,12 +25,19 @@ Solo se usan endpoints read-only existentes del backend:
 Crear `frontend/admin/.env`:
 
 ```bash
+cp .env.example .env
+```
+
+Configurar:
+
+```bash
 VITE_API_URL=http://localhost:8080
 VITE_ADMIN_DEMO_PASSWORD=nocountry-admin
 ```
 
 - `VITE_API_URL`: base URL del backend.
 - `VITE_ADMIN_DEMO_PASSWORD`: password demo para login local (opcional, default `nocountry-admin`).
+- `PASSWORD`: no es leida por Vite ni por la app admin; usar `VITE_ADMIN_DEMO_PASSWORD`.
 
 ## Ejecucion local
 
