@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 
 import { metricsService } from '@/admin/services/metricsService'
 import { sessionsService } from '@/admin/services/sessionsService'
-import type { DashboardStats, DateRangeParams, OrderDto } from '@/admin/types/api'
+import type { DashboardStats, DateRangeParams, IntegrationLogDto, OrderDto } from '@/admin/types/api'
 import { mapWithConcurrency } from '@/lib/utils'
 
 const DASHBOARD_SESSION_SAMPLE = 40
 const DASHBOARD_DETAIL_CONCURRENCY = 5
 const SUCCESS_ORDER_STATES = new Set(['SUCCESS', 'SUCCEEDED', 'PAID'])
 const FAILED_ORDER_STATES = new Set(['FAILED', 'ERROR', 'CANCELED'])
+const SUCCESS_INTEGRATION_STATES = new Set(['SENT', 'SENT_WITH_WARNINGS'])
 
 export function useDashboardStats(filters: DateRangeParams) {
   return useQuery({
@@ -27,6 +28,8 @@ export function useDashboardStats(filters: DateRangeParams) {
       )
 
       const orders = details.flatMap((detail) => detail?.orders ?? [])
+      const integrations = details.flatMap((detail) => detail?.integrations ?? [])
+      const unknownSessions = details.filter((detail) => !detail || (detail.orders?.length ?? 0) === 0).length
       const totalEvents = metrics.landingView + metrics.clickCta + metrics.beginCheckout + metrics.purchase
       const successOrders = orders.filter((order) => SUCCESS_ORDER_STATES.has(resolveBusinessStatus(order))).length
       const failedOrders = orders.filter((order) => FAILED_ORDER_STATES.has(resolveBusinessStatus(order))).length
@@ -50,16 +53,22 @@ export function useDashboardStats(filters: DateRangeParams) {
         }
       }
 
+      if (unknownSessions > 0) {
+        groupedStatus.set('UNKNOWN', (groupedStatus.get('UNKNOWN') ?? 0) + unknownSessions)
+      }
+
       return {
         totalSessions: sessionItems.length,
         totalEvents,
         totalOrders: orders.length,
+        unknownSessions,
         conversionRate: metrics.conversionRate,
         successOrders,
         failedOrders,
         revenue,
-        ga4Health: null,
-        metaHealth: null,
+        ga4Health: resolveIntegrationHealth(integrations, 'GA4_MP'),
+        metaHealth: resolveIntegrationHealth(integrations, 'META_CAPI'),
+        pipedriveHealth: resolveIntegrationHealth(integrations, 'PIPEDRIVE'),
         ordersByStatus: Array.from(groupedStatus.entries()).map(([status, total]) => ({ status, total })),
         revenueByDay: Array.from(groupedRevenue.entries())
           .sort(([a], [b]) => a.localeCompare(b))
@@ -75,4 +84,15 @@ export function useDashboardStats(filters: DateRangeParams) {
 
 function resolveBusinessStatus(order: OrderDto) {
   return (order.businessStatus || order.status || 'UNKNOWN').toUpperCase()
+}
+
+function resolveIntegrationHealth(rows: IntegrationLogDto[], integration: string) {
+  const attemptedRows = rows.filter((row) => {
+    return row.integration === integration && row.status.toUpperCase() !== 'SKIPPED'
+  })
+  if (attemptedRows.length === 0) {
+    return null
+  }
+  const successCount = attemptedRows.filter((row) => SUCCESS_INTEGRATION_STATES.has(row.status.toUpperCase())).length
+  return (successCount / attemptedRows.length) * 100
 }

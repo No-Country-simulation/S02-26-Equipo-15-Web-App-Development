@@ -71,5 +71,5 @@ npm run preview
 
 ## Notas funcionales
 
-- El backend actual no expone `integrations_log` en los endpoints `/api/admin/*`, por lo que estado GA4/Meta en tablas y trace se muestra como `N/A` o inferido.
-- El trace view construye timeline con `tracking_session`, `tracking_event`, `orders` y pasos inferidos desde `payloadJson` cuando existe.
+- El endpoint `GET /api/admin/sessions/{eventId}` incluye `integrations` (fuente: `integrations_log`) para mostrar estado real de GA4, Meta y Pipedrive.
+- El trace view combina `tracking_session`, `tracking_event`, `orders` e integraciones; cuando falta data de webhook, infiere un paso desde `payloadJson` de `purchase`.

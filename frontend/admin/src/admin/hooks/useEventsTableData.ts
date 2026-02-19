@@ -59,6 +59,9 @@ export function useEventsTableData(params: EventsParams) {
 
     return (eventsQuery.data?.items ?? []).map((event) => {
       const session = sessionLookup.get(event.eventId)
+      const orderId = event.eventType === 'purchase'
+        ? (orderLookup.get(event.eventId) ?? null)
+        : null
       return {
         ...event,
         landingPath: session?.landingPath ?? null,
@@ -67,7 +70,7 @@ export function useEventsTableData(params: EventsParams) {
         utmCampaign: session?.utmCampaign ?? null,
         gclid: session?.gclid ?? null,
         fbclid: session?.fbclid ?? null,
-        orderId: orderLookup.get(event.eventId) ?? null,
+        orderId,
       }
     })
   }, [detailLookupQuery.data, eventIds, eventsQuery.data?.items, sessionsQuery.data?.items])

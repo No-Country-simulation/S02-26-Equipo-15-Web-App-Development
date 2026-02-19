@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { sessionsService } from '@/admin/services/sessionsService'
-import type { SessionTableRow, SessionsParams } from '@/admin/types/api'
+import type { SessionDetail, SessionTableRow, SessionsParams } from '@/admin/types/api'
 import { mapWithConcurrency } from '@/lib/utils'
 
 const SESSION_DETAILS_CONCURRENCY = 4
@@ -41,8 +41,9 @@ export function useSessionsTableData(params: SessionsParams) {
         amount: latestOrder?.amount ?? null,
         currency: latestOrder?.currency ?? null,
         businessStatus,
-        ga4Status: 'N/A',
-        metaStatus: 'N/A',
+        ga4Status: resolveIntegrationStatus(detail, 'GA4_MP'),
+        metaStatus: resolveIntegrationStatus(detail, 'META_CAPI'),
+        pipedriveStatus: resolveIntegrationStatus(detail, 'PIPEDRIVE'),
       }
     })
   }, [detailLookupQuery.data, sessionItems])
@@ -54,4 +55,12 @@ export function useSessionsTableData(params: SessionsParams) {
     rows,
     isLoadingDetails,
   }
+}
+
+function resolveIntegrationStatus(detail: SessionDetail | null | undefined, integration: string) {
+  if (!detail?.integrations?.length) {
+    return 'N/A'
+  }
+  const row = detail.integrations.find((item) => item.integration === integration)
+  return (row?.status || 'N/A').toUpperCase()
 }

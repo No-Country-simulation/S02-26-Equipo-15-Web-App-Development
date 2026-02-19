@@ -5,7 +5,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isSessionDetail(value: unknown): value is SessionDetail {
-  return isObject(value) && isObject(value.session) && Array.isArray(value.events) && Array.isArray(value.orders)
+  if (!(isObject(value) && isObject(value.session) && Array.isArray(value.events) && Array.isArray(value.orders))) {
+    return false
+  }
+  if (!('integrations' in value)) {
+    return true
+  }
+  return Array.isArray(value.integrations)
 }
 
 function toFiniteNumber(value: unknown, fallback: number) {
@@ -43,5 +49,8 @@ export function ensureSessionDetail(payload: unknown, endpoint: string): Session
     throw invalidResponseError(endpoint)
   }
 
-  return payload
+  return {
+    ...payload,
+    integrations: Array.isArray(payload.integrations) ? payload.integrations : [],
+  }
 }

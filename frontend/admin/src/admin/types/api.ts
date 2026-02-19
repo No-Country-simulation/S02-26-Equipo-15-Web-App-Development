@@ -52,6 +52,20 @@ export interface SessionDetail {
   session: SessionSummary
   events: EventDto[]
   orders: OrderDto[]
+  integrations: IntegrationLogDto[]
+}
+
+export interface IntegrationLogDto {
+  id: string
+  integration: string
+  referenceId: string | null
+  status: string
+  httpStatus: number | null
+  latencyMs: number | null
+  requestPayload: string | null
+  responsePayload: string | null
+  errorMessage: string | null
+  createdAt: string
 }
 
 export interface MetricsDto {
@@ -85,6 +99,7 @@ export interface SessionTableRow extends SessionSummary {
   businessStatus: string
   ga4Status: string
   metaStatus: string
+  pipedriveStatus: string
 }
 
 export interface DashboardOrderStat {
@@ -101,12 +116,14 @@ export interface DashboardStats {
   totalSessions: number
   totalEvents: number
   totalOrders: number
+  unknownSessions: number
   conversionRate: number
   successOrders: number
   failedOrders: number
   revenue: number
   ga4Health: number | null
   metaHealth: number | null
+  pipedriveHealth: number | null
   ordersByStatus: DashboardOrderStat[]
   revenueByDay: DashboardRevenuePoint[]
 }
