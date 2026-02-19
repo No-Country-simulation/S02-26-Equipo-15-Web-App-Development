@@ -13,7 +13,7 @@ import { Button } from '@/admin/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/admin/components/ui/card'
 import { sessionsService } from '@/admin/services/sessionsService'
 import { normalizeHttpError } from '@/admin/services/apiClient'
-import type { EventDto, SessionDetail } from '@/admin/types/api'
+import type { EventDto, IntegrationLogDto, SessionDetail } from '@/admin/types/api'
 import { formatCurrency, formatDateTime, safeJsonParse } from '@/lib/utils'
 
 interface TimelineItem {
@@ -54,7 +54,7 @@ export function SessionTracePage() {
       paymentIntentId: order?.paymentIntentId ?? '-',
       stripeSessionId: order?.stripeSessionId ?? '-',
       transactionId: order?.stripeSessionId ?? '-',
-      fbtraceId: 'N/A',
+      fbtraceId: resolveFbtraceId(detailQuery.data),
     }
   }, [detailQuery.data])
 
@@ -216,31 +216,18 @@ function buildTimeline(detail: SessionDetail): TimelineItem[] {
       })
     })
 
-  const lastTimestamp = detail.orders[0]?.createdAt ?? detail.events[0]?.createdAt ?? detail.session.lastSeenAt
-  rows.push({
-    id: 'ga4-placeholder',
-    title: 'GA4 MP',
-    subtitle: 'http_status no disponible en /api/admin/sessions/{eventId}',
-    timestamp: lastTimestamp,
-    status: 'N/A',
-    payload: { message: 'Backend admin detail endpoint no expone integrations_log' },
-  })
-  rows.push({
-    id: 'meta-placeholder',
-    title: 'Meta CAPI',
-    subtitle: 'http_status / events_received no disponible en endpoint actual',
-    timestamp: lastTimestamp,
-    status: 'N/A',
-    payload: { message: 'Backend admin detail endpoint no expone integrations_log' },
-  })
-  rows.push({
-    id: 'pipedrive-placeholder',
-    title: 'Pipedrive',
-    subtitle: 'Informacion no disponible en endpoint actual',
-    timestamp: lastTimestamp,
-    status: 'N/A',
-    payload: { message: 'Backend admin detail endpoint no expone integracion de Pipedrive' },
-  })
+  detail.integrations
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .forEach((integration) => {
+      rows.push({
+        id: `integration-${integration.id}`,
+        title: integrationLabel(integration.integration),
+        subtitle: integrationSubtitle(integration),
+        timestamp: integration.createdAt,
+        status: integration.status || 'N/A',
+        payload: integrationPayload(integration),
+      })
+    })
 
   return rows.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 }
@@ -261,6 +248,57 @@ function inferStripeWebhookStep(event: EventDto): TimelineItem | null {
     status: 'PROCESSED',
     payload,
   }
+}
+
+function integrationLabel(integration: string) {
+  if (integration === 'GA4_MP') {
+    return 'integration: GA4 MP'
+  }
+  if (integration === 'META_CAPI') {
+    return 'integration: Meta CAPI'
+  }
+  if (integration === 'PIPEDRIVE') {
+    return 'integration: Pipedrive'
+  }
+  return `integration: ${integration}`
+}
+
+function integrationSubtitle(integration: IntegrationLogDto) {
+  const chunks: string[] = []
+  if (integration.httpStatus != null) {
+    chunks.push(`http=${integration.httpStatus}`)
+  }
+  if (integration.latencyMs != null) {
+    chunks.push(`latency=${integration.latencyMs}ms`)
+  }
+  if (integration.errorMessage) {
+    chunks.push(integration.errorMessage)
+  }
+  if (chunks.length === 0) {
+    return `status=${integration.status}`
+  }
+  return chunks.join(' | ')
+}
+
+function integrationPayload(integration: IntegrationLogDto) {
+  return {
+    ...integration,
+    requestPayload: safeJsonParse(integration.requestPayload) ?? integration.requestPayload,
+    responsePayload: safeJsonParse(integration.responsePayload) ?? integration.responsePayload,
+  }
+}
+
+function resolveFbtraceId(detail: SessionDetail | undefined) {
+  if (!detail?.integrations?.length) {
+    return 'N/A'
+  }
+  const meta = detail.integrations.find((row) => row.integration === 'META_CAPI')
+  if (!meta?.responsePayload) {
+    return 'N/A'
+  }
+  const parsed = safeJsonParse(meta.responsePayload) as Record<string, unknown> | null
+  const fbtraceId = parsed?.fbtrace_id
+  return typeof fbtraceId === 'string' && fbtraceId.length > 0 ? fbtraceId : 'N/A'
 }
 
 function KeyValue({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {

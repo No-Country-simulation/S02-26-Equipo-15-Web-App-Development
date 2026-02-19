@@ -1,6 +1,7 @@
 package com.nocountry.api.service;
 
 import com.nocountry.api.dto.EventDto;
+import com.nocountry.api.dto.IntegrationLogDto;
 import com.nocountry.api.dto.MetricsDto;
 import com.nocountry.api.dto.OrderDto;
 import com.nocountry.api.dto.SessionDetailDto;
@@ -76,7 +77,17 @@ public class AdminQueryService {
                 ORDER BY created_at DESC
                 """, this::mapOrder, eventId);
 
-        return new SessionDetailDto(sessions.get(0), events, orders);
+        List<IntegrationLogDto> integrations = jdbcTemplate.query("""
+                SELECT id, integration, reference_id, status, http_status, latency_ms,
+                       request_payload::text AS request_payload,
+                       response_payload::text AS response_payload,
+                       error_message, created_at
+                FROM integrations_log
+                WHERE reference_id = ?
+                ORDER BY created_at DESC
+                """, this::mapIntegration, eventId.toString());
+
+        return new SessionDetailDto(sessions.get(0), events, orders, integrations);
     }
 
     public List<EventDto> findEvents(String eventType, Instant from, Instant to, int limit, int offset) {
@@ -179,6 +190,21 @@ public class AdminQueryService {
                 rs.getString("currency"),
                 rs.getString("status"),
                 rs.getString("business_status"),
+                toInstant(rs, "created_at")
+        );
+    }
+
+    private IntegrationLogDto mapIntegration(ResultSet rs, int rowNum) throws SQLException {
+        return new IntegrationLogDto(
+                toUuid(rs.getString("id")),
+                rs.getString("integration"),
+                rs.getString("reference_id"),
+                rs.getString("status"),
+                (Integer) rs.getObject("http_status"),
+                (Integer) rs.getObject("latency_ms"),
+                rs.getString("request_payload"),
+                rs.getString("response_payload"),
+                rs.getString("error_message"),
                 toInstant(rs, "created_at")
         );
     }

@@ -54,6 +54,7 @@ export function DashboardPage() {
   const summaryBars = [
     { name: 'SUCCESS', value: query.data?.successOrders ?? 0 },
     { name: 'FAILED', value: query.data?.failedOrders ?? 0 },
+    { name: 'UNKNOWN', value: query.data?.unknownSessions ?? 0 },
   ]
 
   const error = useMemo(() => (query.error ? normalizeHttpError(query.error) : null), [query.error])
@@ -80,15 +81,21 @@ export function DashboardPage() {
               title="SUCCESS vs FAILED"
               value={`${query.data.successOrders} / ${query.data.failedOrders}`}
             />
+            <KpiCard title="Sesiones UNKNOWN" value={query.data.unknownSessions} subtext="Sesiones sin orden asociada" />
             <KpiCard
               title="Integrations Health GA4"
               value={query.data.ga4Health == null ? 'N/A' : `${Math.round(query.data.ga4Health)}%`}
-              subtext="No expuesto por endpoints admin actuales"
+              subtext="Basado en integrations_log (sin SKIPPED)"
             />
             <KpiCard
               title="Integrations Health Meta"
               value={query.data.metaHealth == null ? 'N/A' : `${Math.round(query.data.metaHealth)}%`}
-              subtext="No expuesto por endpoints admin actuales"
+              subtext="Basado en integrations_log (sin SKIPPED)"
+            />
+            <KpiCard
+              title="Integrations Health Pipedrive"
+              value={query.data.pipedriveHealth == null ? 'N/A' : `${Math.round(query.data.pipedriveHealth)}%`}
+              subtext="Basado en integrations_log (sin SKIPPED)"
             />
             <KpiCard title="Conversion rate" value={`${(query.data.conversionRate * 100).toFixed(2)}%`} />
           </div>
@@ -140,7 +147,7 @@ export function DashboardPage() {
 
           <div className="grid gap-6 xl:grid-cols-3">
             <ChartCard
-              title="Ordenes SUCCESS vs FAILED"
+              title="SUCCESS vs FAILED vs UNKNOWN"
               className="xl:col-span-2"
               chartClassName="h-[280px] min-h-[260px]"
               isLoading={query.isPending}
@@ -177,6 +184,10 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted">ERROR</span>
                   <StatusChip status="ERROR" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted">UNKNOWN</span>
+                  <StatusChip status="UNKNOWN" />
                 </div>
               </CardContent>
             </Card>
