@@ -24,7 +24,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
 
     private static final String UPDATE_BY_PAYMENT_INTENT_SQL = """
             UPDATE orders
-            SET event_id = COALESCE(orders.event_id, :eventId),
+            SET event_id = COALESCE(:eventId, orders.event_id),
                 stripe_session_id = CASE
                     WHEN orders.stripe_session_id = :paymentIntentId
                       OR orders.stripe_session_id IS NULL
@@ -42,7 +42,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
 
     private static final String UPDATE_BY_STRIPE_SESSION_SQL = """
             UPDATE orders
-            SET event_id = COALESCE(orders.event_id, :eventId),
+            SET event_id = COALESCE(:eventId, orders.event_id),
                 payment_intent_id = COALESCE(orders.payment_intent_id, :paymentIntentId),
                 amount = :amount,
                 currency = :currency,

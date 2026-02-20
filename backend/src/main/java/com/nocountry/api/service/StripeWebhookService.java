@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
@@ -248,6 +249,7 @@ public class StripeWebhookService {
         long amountMinorUnits = paymentIntent.path("amount_received").asLong(paymentIntent.path("amount").asLong(0));
         BigDecimal amount = amountFromMinorUnits(amountMinorUnits);
         String status = uppercaseOrDefault(text(paymentIntent, "status"), "SUCCEEDED");
+        String businessStatus = toBusinessStatus(status);
         UUID eventId = extractTrackingEventIdFromMetadata(paymentIntent.path("metadata"));
         String clientId = text(paymentIntent.path("metadata"), "client_id");
         String customerEmail = extractPaymentIntentCustomerEmail(paymentIntent);
@@ -258,11 +260,9 @@ public class StripeWebhookService {
             OrderRecord existingOrder = existingByPaymentIntent.get();
             boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
             boolean gainedEventId = false;
-            if (eventId == null) {
-                eventId = existingOrder.getEventId();
-            }
+            eventId = resolveEventIdWithOrphanFallback(eventId, existingOrder.getEventId(), paymentIntentId, businessStatus);
             existingOrder.setStatus(status);
-            existingOrder.setBusinessStatus(toBusinessStatus(status));
+            existingOrder.setBusinessStatus(businessStatus);
             existingOrder.setAmount(amount);
             existingOrder.setCurrency(currency);
             upsertStripeSessionId(existingOrder, stripeSessionId, paymentIntentId);
@@ -285,12 +285,10 @@ public class StripeWebhookService {
             OrderRecord existingOrder = existingBySession.get();
             boolean wasSuccessful = isSuccessfulStatus(existingOrder.getStatus());
             boolean gainedEventId = false;
-            if (eventId == null) {
-                eventId = existingOrder.getEventId();
-            }
+            eventId = resolveEventIdWithOrphanFallback(eventId, existingOrder.getEventId(), paymentIntentId, businessStatus);
             existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
             existingOrder.setStatus(status);
-            existingOrder.setBusinessStatus(toBusinessStatus(status));
+            existingOrder.setBusinessStatus(businessStatus);
             existingOrder.setAmount(amount);
             existingOrder.setCurrency(currency);
             if (existingOrder.getEventId() == null && eventId != null) {
@@ -308,6 +306,7 @@ public class StripeWebhookService {
         }
 
         OrderRecord orderRecord = new OrderRecord();
+        eventId = resolveEventIdWithOrphanFallback(eventId, null, paymentIntentId, businessStatus);
         orderRecord.setId(UUID.randomUUID());
         orderRecord.setEventId(eventId);
         orderRecord.setStripeSessionId(stripeSessionId);
@@ -315,19 +314,17 @@ public class StripeWebhookService {
         orderRecord.setAmount(amount);
         orderRecord.setCurrency(currency);
         orderRecord.setStatus(status);
-        orderRecord.setBusinessStatus(toBusinessStatus(status));
+        orderRecord.setBusinessStatus(businessStatus);
         orderRecord.setCreatedAt(Instant.now(clock));
         OrderRecord persistedOrder = saveOrderResilient(orderRecord, paymentIntentId, stripeSessionId);
 
         if (!orderRecord.getId().equals(persistedOrder.getId())) {
             boolean wasSuccessful = isSuccessfulStatus(persistedOrder.getStatus());
             boolean gainedEventId = false;
-            if (eventId == null) {
-                eventId = persistedOrder.getEventId();
-            }
+            eventId = resolveEventIdWithOrphanFallback(eventId, persistedOrder.getEventId(), paymentIntentId, businessStatus);
             persistedOrder.setPaymentIntentId(coalesce(persistedOrder.getPaymentIntentId(), paymentIntentId));
             persistedOrder.setStatus(status);
-            persistedOrder.setBusinessStatus(toBusinessStatus(status));
+            persistedOrder.setBusinessStatus(businessStatus);
             persistedOrder.setAmount(amount);
             persistedOrder.setCurrency(currency);
             upsertStripeSessionId(persistedOrder, stripeSessionId, paymentIntentId);
@@ -351,6 +348,34 @@ public class StripeWebhookService {
             log.info("stripe_order pending paymentIntentId={} status={}", paymentIntentId, status);
         }
         return persistedOrder.getEventId();
+    }
+
+    private UUID resolveEventIdWithOrphanFallback(
+            UUID webhookEventId,
+            UUID existingOrderEventId,
+            String paymentIntentId,
+            String businessStatus
+    ) {
+        if (existingOrderEventId != null) {
+            return existingOrderEventId;
+        }
+        if (webhookEventId != null) {
+            return webhookEventId;
+        }
+        if (("FAILED".equalsIgnoreCase(businessStatus) || "PENDING".equalsIgnoreCase(businessStatus))
+                && !isBlank(paymentIntentId)) {
+            UUID syntheticEventId = UUID.nameUUIDFromBytes(
+                    ("stripe_orphan|" + paymentIntentId).getBytes(StandardCharsets.UTF_8)
+            );
+            log.info(
+                    "stripe_order generated_orphan_event_id paymentIntentId={} businessStatus={} eventId={}",
+                    paymentIntentId,
+                    businessStatus,
+                    syntheticEventId
+            );
+            return syntheticEventId;
+        }
+        return null;
     }
 
     private StripeWebhookEvent findOrCreateEvent(String stripeEventId) {
@@ -524,8 +549,7 @@ public class StripeWebhookService {
         if ("FAILED".equals(normalized)
                 || "CANCELED".equals(normalized)
                 || "CANCELLED".equals(normalized)
-                || "UNPAID".equals(normalized)
-                || "REQUIRES_PAYMENT_METHOD".equals(normalized)) {
+                || "UNPAID".equals(normalized)) {
             return "FAILED";
         }
 
@@ -533,6 +557,7 @@ public class StripeWebhookService {
                 || "REQUIRES_ACTION".equals(normalized)
                 || "REQUIRES_CONFIRMATION".equals(normalized)
                 || "REQUIRES_CAPTURE".equals(normalized)
+                || "REQUIRES_PAYMENT_METHOD".equals(normalized)
                 || "PENDING".equals(normalized)
                 || "OPEN".equals(normalized)
                 || "UNKNOWN".equals(normalized)) {
