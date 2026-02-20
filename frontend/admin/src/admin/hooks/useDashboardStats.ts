@@ -30,10 +30,11 @@ export function useDashboardStats(filters: DateRangeParams) {
 
       const orders = details.flatMap((detail) => detail?.orders ?? [])
       const integrations = details.flatMap((detail) => detail?.integrations ?? [])
+      const orphanFailedOrders = metrics.orphanFailedOrders ?? 0
       const unknownSessions = details.filter((detail) => !detail || (detail.orders?.length ?? 0) === 0).length
       const totalEvents = metrics.landingView + metrics.clickCta + metrics.beginCheckout + metrics.purchase
       const successOrders = orders.filter((order) => SUCCESS_ORDER_STATES.has(resolveBusinessStatus(order))).length
-      const failedOrders = orders.filter((order) => FAILED_ORDER_STATES.has(resolveBusinessStatus(order))).length
+      const failedOrders = orders.filter((order) => FAILED_ORDER_STATES.has(resolveBusinessStatus(order))).length + orphanFailedOrders
       const revenue = orders.reduce((acc, order) => {
         if (!SUCCESS_ORDER_STATES.has(resolveBusinessStatus(order))) {
           return acc
@@ -57,11 +58,14 @@ export function useDashboardStats(filters: DateRangeParams) {
       if (unknownSessions > 0) {
         groupedStatus.set('UNKNOWN', (groupedStatus.get('UNKNOWN') ?? 0) + unknownSessions)
       }
+      if (orphanFailedOrders > 0) {
+        groupedStatus.set('FAILED', (groupedStatus.get('FAILED') ?? 0) + orphanFailedOrders)
+      }
 
       return {
         totalSessions: sessionItems.length,
         totalEvents,
-        totalOrders: orders.length,
+        totalOrders: orders.length + orphanFailedOrders,
         unknownSessions,
         conversionRate: metrics.conversionRate,
         successOrders,

@@ -136,7 +136,25 @@ public class AdminQueryService {
 
         double conversionRate = landingView == 0 ? 0.0 : ((double) purchase / (double) landingView);
 
-        return new MetricsDto(landingView, clickCta, beginCheckout, purchase, conversionRate);
+        StringBuilder orphanFailedSql = new StringBuilder("""
+                SELECT COUNT(*) AS total
+                FROM orders
+                WHERE event_id IS NULL
+                  AND UPPER(COALESCE(business_status, 'UNKNOWN')) = 'FAILED'
+                """);
+
+        List<Object> orphanArgs = new ArrayList<>();
+        appendTimeRange(orphanFailedSql, orphanArgs, from, to, "created_at");
+        Long orphanFailedOrders = jdbcTemplate.queryForObject(orphanFailedSql.toString(), Long.class, orphanArgs.toArray());
+
+        return new MetricsDto(
+                landingView,
+                clickCta,
+                beginCheckout,
+                purchase,
+                conversionRate,
+                orphanFailedOrders == null ? 0L : orphanFailedOrders
+        );
     }
 
     private void appendTimeRange(StringBuilder sql, List<Object> args, Instant from, Instant to, String column) {

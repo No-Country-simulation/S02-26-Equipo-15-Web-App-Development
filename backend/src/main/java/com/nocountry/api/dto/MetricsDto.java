@@ -5,6 +5,7 @@ public record MetricsDto(
         long clickCta,
         long beginCheckout,
         long purchase,
-        double conversionRate
+        double conversionRate,
+        long orphanFailedOrders
 ) {
 }
