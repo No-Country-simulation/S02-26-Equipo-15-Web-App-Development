@@ -51,10 +51,12 @@ export function DashboardPage() {
 
   const chartData = query.data?.ordersByStatus ?? []
   const revenueData = query.data?.revenueByDay ?? []
+  const statusTotals = new Map((query.data?.ordersByStatus ?? []).map((row) => [row.status.toUpperCase(), row.total]))
   const summaryBars = [
-    { name: 'SUCCESS', value: query.data?.successOrders ?? 0 },
-    { name: 'FAILED', value: query.data?.failedOrders ?? 0 },
-    { name: 'UNKNOWN', value: query.data?.unknownSessions ?? 0 },
+    { name: 'SUCCESS', value: statusTotals.get('SUCCESS') ?? 0 },
+    { name: 'FAILED', value: statusTotals.get('FAILED') ?? 0 },
+    { name: 'PENDING', value: statusTotals.get('PENDING') ?? 0 },
+    { name: 'UNKNOWN', value: statusTotals.get('UNKNOWN') ?? 0 },
   ]
 
   const error = useMemo(() => (query.error ? normalizeHttpError(query.error) : null), [query.error])
@@ -147,7 +149,7 @@ export function DashboardPage() {
 
           <div className="grid gap-6 xl:grid-cols-3">
             <ChartCard
-              title="SUCCESS vs FAILED vs UNKNOWN"
+              title="Distribucion de estados de negocio (SUCCESS, FAILED, PENDING, UNKNOWN)"
               className="xl:col-span-2"
               chartClassName="h-[280px] min-h-[260px]"
               isLoading={query.isPending}
