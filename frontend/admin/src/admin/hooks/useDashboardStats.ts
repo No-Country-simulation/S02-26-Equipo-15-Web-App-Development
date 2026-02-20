@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 
 import { metricsService } from '@/admin/services/metricsService'
 import { sessionsService } from '@/admin/services/sessionsService'
-import type { DashboardStats, DateRangeParams, IntegrationLogDto, OrderDto } from '@/admin/types/api'
+import type { DashboardStats, DateRangeParams, IntegrationLogDto, OrderDto, SessionSummary } from '@/admin/types/api'
 import { mapWithConcurrency } from '@/lib/utils'
 
-const DASHBOARD_SESSION_SAMPLE = 40
-const DASHBOARD_DETAIL_CONCURRENCY = 5
+const DASHBOARD_SESSIONS_PAGE_SIZE = 100
+const DASHBOARD_MAX_SESSIONS = 1000
+const DASHBOARD_DETAIL_CONCURRENCY = 6
 const SUCCESS_ORDER_STATES = new Set(['SUCCESS', 'SUCCEEDED', 'PAID'])
 const FAILED_ORDER_STATES = new Set(['FAILED', 'ERROR', 'CANCELED'])
 const SUCCESS_INTEGRATION_STATES = new Set(['SENT', 'SENT_WITH_WARNINGS'])
@@ -17,9 +18,9 @@ export function useDashboardStats(filters: DateRangeParams) {
     queryFn: async (): Promise<DashboardStats> => {
       const [metrics, sessions] = await Promise.all([
         metricsService.getMetrics(filters),
-        sessionsService.getSessions({ ...filters, limit: DASHBOARD_SESSION_SAMPLE, offset: 0 }),
+        loadSessions(filters),
       ])
-      const sessionItems = sessions.items ?? []
+      const sessionItems = sessions
 
       const details = await mapWithConcurrency(
         sessionItems,
@@ -80,6 +81,30 @@ export function useDashboardStats(filters: DateRangeParams) {
     },
     staleTime: 60_000,
   })
+}
+
+async function loadSessions(filters: DateRangeParams): Promise<SessionSummary[]> {
+  const rows: SessionSummary[] = []
+  let offset = 0
+
+  while (rows.length < DASHBOARD_MAX_SESSIONS) {
+    const limit = Math.min(DASHBOARD_SESSIONS_PAGE_SIZE, DASHBOARD_MAX_SESSIONS - rows.length)
+    const page = await sessionsService.getSessions({ ...filters, limit, offset })
+    const items = page.items ?? []
+
+    if (items.length === 0) {
+      break
+    }
+
+    rows.push(...items)
+
+    if (items.length < limit) {
+      break
+    }
+    offset += limit
+  }
+
+  return rows
 }
 
 function resolveBusinessStatus(order: OrderDto) {

@@ -186,6 +186,10 @@ export function DashboardPage() {
                   <StatusChip status="ERROR" />
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted">PENDING</span>
+                  <StatusChip status="PENDING" />
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-sm text-muted">UNKNOWN</span>
                   <StatusChip status="UNKNOWN" />
                 </div>
