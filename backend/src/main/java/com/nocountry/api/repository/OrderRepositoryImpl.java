@@ -82,6 +82,7 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
     @Override
     public OrderRecord upsert(OrderRecord candidate) {
         MapSqlParameterSource params = toParams(candidate);
+        DataIntegrityViolationException insertException = null;
 
         if (hasText(candidate.getPaymentIntentId())) {
             int updatedByPaymentIntent = jdbcTemplate.update(UPDATE_BY_PAYMENT_INTENT_SQL, params);
@@ -109,13 +110,19 @@ public class OrderRepositoryImpl implements OrderRepositoryCustom {
                     return insertedRow;
                 }
             }
-        } catch (DataIntegrityViolationException ignored) {
+        } catch (DataIntegrityViolationException ex) {
             // Parallel webhook may insert first; fallback lookup below handles it.
+            // Preserve exception so callers can handle FK retries when fallback misses.
+            insertException = ex;
         }
 
         OrderRecord fallback = findExisting(candidate);
         if (fallback != null) {
             return fallback;
+        }
+
+        if (insertException != null) {
+            throw insertException;
         }
 
         throw new IllegalStateException("Unable to upsert order for stripeSessionId=" + candidate.getStripeSessionId());
