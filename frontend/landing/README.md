@@ -30,6 +30,7 @@ Variables usadas:
 ```env
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 VITE_API_URL=http://localhost:8080
+# Compat: tambien acepta VITE_API_BASE
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 VITE_META_PIXEL_ID=123456789012345
 ```

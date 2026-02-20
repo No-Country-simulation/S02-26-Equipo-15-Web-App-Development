@@ -96,6 +96,12 @@ Eventos permitidos: `landing_view`, `click_cta`, `begin_checkout`, `purchase`.
 - `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174`
 
+## Notas Stripe webhook
+
+- `STRIPE_WEBHOOK_SECRET` se usa tanto en local como en Railway/produccion.
+- `stripe login` se ejecuta en tu maquina local (CLI), no dentro de Railway.
+- `GET /api/stripe/webhook` debe responder `405 METHOD_NOT_ALLOWED`; Stripe envia `POST`.
+
 ## Ejecutar en local
 
 ```bash
