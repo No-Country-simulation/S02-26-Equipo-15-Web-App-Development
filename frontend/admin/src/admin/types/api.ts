@@ -74,6 +74,7 @@ export interface MetricsDto {
   beginCheckout: number
   purchase: number
   conversionRate: number
+  orphanFailedOrders: number
 }
 
 export interface DateRangeParams {
