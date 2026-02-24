@@ -18,6 +18,8 @@ El esquema vigente se define en:
 - `backend/src/main/resources/db/migration/V5__orders_payment_intent_unique.sql`
 - `backend/src/main/resources/db/migration/V6__stripe_webhook_event_add_event_id.sql`
 - `backend/src/main/resources/db/migration/V7__orders_add_business_status.sql`
+- `backend/src/main/resources/db/migration/V8__orders_fix_requires_payment_method_business_status.sql`
+- `backend/src/main/resources/db/migration/V9__orders_unpaid_business_status_pending.sql`
 
 ## Uso rapido
 
@@ -35,3 +37,14 @@ Nota: para ambientes reales, aplicar siempre migraciones Flyway; `BDD/pgcrypto.s
 - `GA4`: Google Analytics 4 (client-side).
 - `GA4_MP`: Google Analytics 4 Measurement Protocol (server-side).
 - `META_CAPI`: Meta Conversions API (server-side).
+
+## Reglas operativas clave
+
+- Idempotencia de pagos:
+  - `orders.stripe_session_id` es unico.
+  - `orders.payment_intent_id` es unico (indice parcial cuando no es null).
+  - `stripe_webhook_event.stripe_event_id` evita reprocesar el mismo webhook.
+- Estado de negocio canonico (`orders.business_status`):
+  - `SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`.
+- Regla intermedia incorporada:
+  - combinacion `status = UNPAID` se normaliza a `business_status = PENDING`.

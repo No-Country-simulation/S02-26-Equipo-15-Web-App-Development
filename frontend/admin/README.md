@@ -71,5 +71,6 @@ npm run preview
 
 ## Notas funcionales
 
-- El endpoint `GET /api/admin/sessions/{eventId}` incluye `integrations` (fuente: `integrations_log`) para mostrar estado real de GA4, Meta y Pipedrive.
+- El endpoint `GET /api/admin/sessions/{eventId}` incluye `integrations` (fuente: `integrations_log`) para mostrar estado real de GA4 y Meta.
 - El trace view combina `tracking_session`, `tracking_event`, `orders` e integraciones; cuando falta data de webhook, infiere un paso desde `payloadJson` de `purchase`.
+- El dashboard usa estado de negocio canonico: `SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`.

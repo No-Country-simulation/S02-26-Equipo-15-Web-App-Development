@@ -35,7 +35,6 @@ Unificar adquisicion, tracking y conversion de pago con correlacion por `eventId
 7. Backend dispara integraciones server-side (segun flags):
    - `GA4_MP` (Google Analytics 4 MP)
    - `META_CAPI`
-   - `PIPEDRIVE`
 8. Resultado por integracion queda en `integrations_log`.
 9. Admin consulta `sessions/events/metrics` via `GET /api/admin/*`.
 
@@ -57,11 +56,9 @@ Nota: los endpoints admin en backend y el frontend `frontend/admin/` estan imple
 - `TRACKING_ENABLED`
 - `META_CAPI_ENABLED`
 - `GA4_MP_ENABLED`
-- `PIPEDRIVE_ENABLED`
 - `STRIPE_WEBHOOK_SECRET`
 - `META_PIXEL_ID`, `META_ACCESS_TOKEN`
 - `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`
-- `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
 ## 5) Donde validar por tramo

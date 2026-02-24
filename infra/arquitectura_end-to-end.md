@@ -9,7 +9,6 @@
 - Pago: Stripe Checkout + webhooks firmados
 - Tracking client-side: Google Analytics 4 (GA4) y Meta Pixel
 - Tracking server-side: Google Analytics 4 MP (GA4 MP) y Meta CAPI
-- CRM opcional: Pipedrive
 
 ## 2) Diagrama de arquitectura
 
@@ -31,7 +30,6 @@ flowchart LR
 
   API -->|purchase server-side| GA4MP[Google Analytics 4 MP]
   API -->|purchase server-side| MCAPI[Meta CAPI]
-  API -->|deal/person opcional| PD[Pipedrive]
 ```
 
 ## 3) Flujo transaccional

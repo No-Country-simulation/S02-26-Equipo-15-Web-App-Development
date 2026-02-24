@@ -187,7 +187,7 @@ export function DashboardPage() {
             </ChartCard>
             <Card>
               <CardHeader>
-                <CardTitle>Leyenda de estados</CardTitle>
+                <CardTitle>Leyenda de estados de negocio</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -197,14 +197,6 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted">FAILED</span>
                   <StatusChip status="FAILED" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted">SENT</span>
-                  <StatusChip status="SENT" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted">ERROR</span>
-                  <StatusChip status="ERROR" />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted">PENDING</span>

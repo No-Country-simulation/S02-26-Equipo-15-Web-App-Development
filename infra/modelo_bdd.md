@@ -137,12 +137,12 @@ Bitacora de procesamiento de webhooks.
 
 ### `integrations_log`
 
-Auditoria de integraciones server-side (Meta CAPI, Google Analytics 4 MP y Pipedrive).
+Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 
 | Columna | Tipo | Nulo | Regla |
 |---|---|---|---|
 | `id` | `uuid` | No | PK |
-| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP`, `PIPEDRIVE` |
+| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP` |
 | `reference_id` | `varchar(255)` | Si | correlacion (`eventId` u otra clave) |
 | `status` | `varchar(32)` | No | `SENT`, `FAILED`, `SKIPPED`, `SENT_WITH_WARNINGS` |
 | `http_status` | `int` | Si | codigo HTTP |

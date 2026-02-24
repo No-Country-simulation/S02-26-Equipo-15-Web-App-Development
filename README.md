@@ -1,250 +1,155 @@
-# S02-26-Equipo-15 | Web App Development
+<p align="center">
+  <img src="./infra/assets/notcountry-readme-header.svg" alt="S02-26-Equipo 15 - Web App Development" width="100%" />
+</p>
 
-Monorepo del equipo 15 para tracking de conversiones, pagos con Stripe y medicion de compras en Google (GA4) y Meta, con panel admin de monitoreo.
+# NoCountry Growth Observability Platform
 
-## Resumen del proyecto
+Plataforma end-to-end para convertir trafico en ventas medibles, uniendo marketing attribution, pagos en Stripe y trazabilidad operativa en un panel admin.
 
-Plataforma full-stack para medir el funnel de conversion de una landing y correlacionar cada interaccion con un pago en Stripe usando `eventId`.
+## Resumen ejecutivo
 
-Incluye:
+Este proyecto resuelve un problema real de growth y operacion:
 
-- Landing web (captura UTM/gclid/fbclid, tracking client-side y redireccion a checkout).
-- Backend API (persistencia, procesamiento de webhooks e integraciones server-side para Google y Meta).
-- Panel admin (consulta de sesiones, eventos y metricas en tiempo real de la base).
-- Base PostgreSQL con migraciones Flyway e historial auditable de integraciones.
+- Captura demanda (Google/Meta) con contexto de campana (`utm_*`, `gclid`, `fbclid`).
+- Correlaciona todo con un `eventId` unico desde landing hasta pago.
+- Confirma conversiones con datos de servidor (GA4 MP y Meta CAPI), no solo con pixel cliente.
+- Expone trazabilidad auditable para negocio, producto y operaciones.
 
-## Contexto de negocio
+En una frase: pasamos de "clicks sin contexto" a "ingresos explicables por sesion".
 
-El producto es una solucion all-in-one para incorporacion, impuestos y bookkeeping en EE.UU.
+## Problema de negocio
 
-- Propuesta de valor: reducir friccion legal/fiscal para founders y equipos que venden en EE.UU.
-- Adquisicion: trafico de anuncios en Google y Meta hacia la landing.
-- Conversion: CTA principal que deriva a checkout en Stripe.
-- Medicion: eventos client-side (GA4/Meta Pixel) + confirmacion server-side de compra (GA4 MP/Meta CAPI).
-- Operacion: panel admin para monitorear sesiones, eventos, compras y metricas del funnel.
-- KPI principal: `landing_view -> click_cta -> begin_checkout -> purchase`.
+En funnels tradicionales, los equipos suelen tener:
 
-## Objetivo del proyecto
+- Datos fragmentados entre landing, Stripe y plataformas de anuncios.
+- Dudas sobre que conversion es real vs estimada por pixel.
+- Poco contexto para explicar por que sube o cae la conversion.
 
-Construir una plataforma con:
+Esta plataforma cierra esa brecha con una capa de observabilidad de conversion orientada a decisiones de negocio.
 
-- Landing de conversion (React + Vite)
-- Backend de tracking/pagos (Spring Boot + PostgreSQL)
-- Integraciones server-side (GA4 MP, Meta CAPI, Pipedrive opcional)
-- Panel administrador para consulta de datos (React + Vite + TypeScript)
+## Propuesta de valor para NotCountry
 
-## Estado actual de modulos
+- Menor friccion comercial: medicion clara del journey completo.
+- Mayor confianza: deduplicacion e idempotencia en pagos/webhooks.
+- Mejor operacion: panel para auditar sesiones, eventos, estado de pago e integraciones.
+- Escalabilidad: arquitectura modular con frontends separados y backend desacoplado.
 
-- `backend/`: implementado y operativo
-- `frontend/landing/`: implementado y operativo
-- `frontend/admin/`: implementado y operativo
-- `infra/`: documentacion tecnica actualizada
-
-## Validacion del objetivo del proyecto
-
-Estado general: `cumplido a nivel MVP funcional`.
-
-Cumplido:
-
-- Tracking del funnel en landing (`landing_view`, `click_cta`, `begin_checkout`).
-- Correlacion por `eventId` entre landing, Stripe y backend.
-- Registro de compra y deduplicacion de ordenes/webhooks.
-- Integraciones de compra en Google y Meta (GA4 MP y Meta CAPI) con auditoria en DB.
-- Panel admin operativo para consultar sesiones, eventos y metricas.
-
-Pendiente para cierre productivo:
-
-- Endurecer autenticacion/autorizacion del admin (hoy usa password demo).
-- Cobertura de pruebas E2E y pruebas de carga.
-- Observabilidad operativa (alertas, dashboards de salud y SLOs).
-- Runbook de despliegue/rollback y validaciones post-deploy.
-
-## Arquitectura del proyecto
-
-```text
-/
-|-- backend/                 # API - Spring Boot 3 / Java 17
-|-- frontend/
-|   |-- landing/             # Landing + Checkout (React + Vite)
-|   `-- admin/               # Panel Administrador (React + Vite + TypeScript)
-|-- infra/                   # Documentacion de arquitectura y modelo de datos
-|-- BDD/                     # Documentacion y scripts de base de datos
-`-- README.md
-```
-
-## Arquitectura end-to-end
+## Arquitectura de alto nivel
 
 ```mermaid
 flowchart LR
   U[Usuario] --> L[Landing React/Vite]
-  A[Operador/Admin] --> AD[Admin Dashboard React/Vite]
+  O[Operador] --> AD[Admin React/Vite]
 
-  L -->|POST /api/track| API[Backend API Spring Boot]
-  L -->|Stripe Checkout| ST[Stripe]
+  L -->|POST /api/track| API[Backend Spring Boot]
+  L -->|Checkout| ST[Stripe]
   ST -->|Webhooks firmados| API
 
-  AD -.->|GET /api/admin/*| API
+  L --> GAC[GA4 client]
+  L --> MPC[Meta Pixel client]
 
   API --> DB[(PostgreSQL + Flyway)]
-  L --> GAC[Google Analytics 4 client]
-  L --> MPC[Meta Pixel client]
-  API --> GASS[Google Analytics 4 MP server-side]
-  API --> MCAPI[Meta CAPI server-side]
-  API --> PD[Pipedrive opcional]
+  API --> GASS[GA4 MP]
+  API --> MCAPI[Meta CAPI]
+
+  AD -->|GET /api/admin/*| API
 ```
 
-## Flujo transaccional
+## Flujo de negocio y datos
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant U as Usuario
-  participant A as Operador/Admin
   participant L as Landing
-  participant AD as Admin Dashboard
-  participant API as Backend API
+  participant API as Backend
   participant ST as Stripe
-  participant DB as Postgres
-  participant GAC as Google Analytics 4 (client)
-  participant MPC as Meta Pixel (client)
-  participant GASS as Google Analytics 4 MP
-  participant MCAPI as Meta CAPI
+  participant DB as PostgreSQL
+  participant GA as GA4 MP
+  participant META as Meta CAPI
+  participant AD as Admin
 
-  U->>L: Entra con UTM/gclid/fbclid
-  L->>API: POST /api/track (landing_view + attribution)
+  U->>L: Visita landing con UTM/gclid/fbclid
+  L->>API: /api/track (landing_view)
   API->>DB: upsert tracking_session + insert tracking_event
-  API-->>L: { "eventId": "<uuid>" }
-  L->>GAC: page_view / click_cta / begin_checkout
-  L->>MPC: PageView / ClickCTA / InitiateCheckout
+  API-->>L: eventId
 
-  U->>ST: Completa pago
-  ST->>API: payment_intent.succeeded
-  ST->>API: checkout.session.completed
+  U->>L: Click CTA / begin checkout
+  L->>ST: Redireccion con client_reference_id=eventId
+  ST->>API: webhook de estado de pago
+  API->>DB: upsert orders + log webhook (idempotente)
 
-  API->>DB: stripe_webhook_event (idempotencia)
-  API->>DB: upsert orders (sin duplicados)
-  API->>DB: tracking_event purchase
-  API->>GASS: Envio purchase server-side
-  GASS-->>API: respuesta Google
-  API->>MCAPI: Envio purchase server-side
-  MCAPI-->>API: respuesta Meta
-  API->>DB: integrations_log (GA4_MP / META_CAPI / PIPEDRIVE)
+  alt pago exitoso
+    API->>GA: purchase server-side
+    API->>META: purchase server-side
+    API->>DB: integrations_log = SENT
+  else pago pendiente/intermedio
+    API->>DB: business_status = PENDING
+  else pago fallido
+    API->>DB: business_status = FAILED
+  end
 
-  A->>AD: Login admin
-  AD->>API: GET /api/admin/sessions|events|metrics
-  API->>DB: consultas read-only
-  API-->>AD: datos de sesiones/eventos/metricas
+  AD->>API: consulta sesiones/eventos/metricas
+  API->>DB: lectura consolidada
+  API-->>AD: trazabilidad completa por eventId
 ```
 
-## Endpoints backend
+## Indicadores clave (KPI)
 
-- `POST /api/track`
-- `POST /api/stripe/webhook`
-- `GET /api/admin/sessions`
-- `GET /api/admin/sessions/{eventId}`
-- `GET /api/admin/events`
-- `GET /api/admin/metrics`
-- `GET /api/health/db`
-- `GET /actuator/health`
+- Funnel principal: `landing_view -> click_cta -> begin_checkout -> purchase`
+- Tasa de conversion por fuente (`utm_source` / `utm_campaign`)
+- Revenue confirmado por rango de fechas
+- Distribucion de estado de negocio: `SUCCESS | PENDING | FAILED | UNKNOWN`
+- Estado de integraciones: `GA4_MP` y `META_CAPI`
 
-## Modelo de datos (resumen)
+## Estado del MVP
 
-```mermaid
-erDiagram
-  TRACKING_SESSION ||--o{ TRACKING_EVENT : has
-  TRACKING_SESSION ||--o{ ORDERS : links
-  TRACKING_SESSION ||--o{ STRIPE_WEBHOOK_EVENT : correlates
+Completado y operativo:
+
+- Landing con tracking de atribucion.
+- Backend con Stripe webhook e idempotencia.
+- Integracion server-side con GA4 MP y Meta CAPI.
+- Admin con sesiones, eventos, metricas y trazabilidad.
+- Modelo de datos versionado con Flyway.
+
+Siguiente foco recomendado:
+
+- Hardening de auth/admin.
+- Alertas y observabilidad operativa.
+- Pruebas E2E automatizadas de checkout y webhooks.
+
+## Estructura del repositorio
+
+```text
+/
+|-- backend/                 # API Spring Boot (Java 17)
+|-- frontend/
+|   |-- landing/             # Landing de conversion
+|   `-- admin/               # Panel observability
+|-- infra/                   # Arquitectura y diagramas
+|-- BDD/                     # Modelo de datos y scripts SQL
+`-- README.md
 ```
 
-Tablas activas:
-
-- `tracking_session`
-- `tracking_event`
-- `orders`
-- `stripe_webhook_event`
-- `integrations_log`
-
-## Flujo de ramas Git
-
-```mermaid
-gitGraph
-  commit id: "init"
-  branch develop
-  checkout develop
-  commit id: "integracion"
-  branch feature/tracking
-  checkout feature/tracking
-  commit id: "feat"
-  checkout develop
-  merge feature/tracking
-  branch feature/webhook
-  checkout feature/webhook
-  commit id: "feat"
-  checkout develop
-  merge feature/webhook
-  checkout main
-  merge develop tag: "release"
-```
-
-## Variables de entorno clave
-
-### Backend (`backend/.env.example`)
-
-- `SPRING_PROFILES_ACTIVE`
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `STRIPE_WEBHOOK_SECRET`
-- `TRACKING_ENABLED`
-- `META_CAPI_ENABLED`
-- `META_PIXEL_ID`
-- `META_ACCESS_TOKEN`
-- `GA4_MP_ENABLED`
-- `GA4_MEASUREMENT_ID`
-- `GA4_API_SECRET`
-- `GA4_MP_DEBUG_VALIDATION_ENABLED`
-- `PIPEDRIVE_ENABLED`
-- `PIPEDRIVE_API_TOKEN`
-- `CORS_ALLOWED_ORIGINS`
-
-### Landing (`frontend/landing/.env.example`)
-
-- `VITE_STRIPE_PAYMENT_LINK`
-- `VITE_API_URL`
-- `VITE_GA_MEASUREMENT_ID`
-- `VITE_META_PIXEL_ID`
-
-### Admin (`frontend/admin/.env.example`)
-
-- `VITE_API_URL`
-- `VITE_ADMIN_DEMO_PASSWORD`
-
-## Ejecucion local
-
-### Backend
+## Levantar en local
 
 ```bash
+# Backend
 cd backend
 mvn spring-boot:run
-```
 
-### Landing
+# Landing
+cd ../frontend/landing
+npm install
+npm run dev
 
-```bash
-cd frontend/landing
+# Admin
+cd ../admin
 npm install
 npm run dev
 ```
 
-### Admin
-
-```bash
-cd frontend/admin
-npm install
-npm run dev
-```
-
-## Documentacion complementaria
+## Documentacion por modulo
 
 - `backend/README.md`
 - `frontend/landing/README.md`

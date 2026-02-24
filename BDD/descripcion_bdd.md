@@ -8,7 +8,7 @@ La BDD existe para sostener ese objetivo de negocio con:
 
 - trazabilidad completa del funnel por `event_id`,
 - registro confiable de compra sin duplicados,
-- auditoria de integraciones (GA4_MP, META_CAPI, PIPEDRIVE).
+- auditoria de integraciones (GA4_MP, META_CAPI).
 
 ## 1) Objetivo
 
@@ -16,7 +16,7 @@ La base de datos soporta tres necesidades:
 
 - trazabilidad de sesiones y eventos de marketing/conversion,
 - consolidacion de pagos Stripe sin duplicados,
-- auditoria de integraciones server-side (Meta CAPI, GA4_MP, Pipedrive).
+- auditoria de integraciones server-side (Meta CAPI, GA4_MP).
 
 La clave de correlacion principal es `event_id` (UUID).
 
@@ -77,7 +77,6 @@ Valores esperados en `integration`:
 
 - `GA4_MP`
 - `META_CAPI`
-- `PIPEDRIVE`
 
 ## 4) Relaciones y correlacion
 
