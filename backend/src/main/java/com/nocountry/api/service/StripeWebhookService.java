@@ -85,7 +85,9 @@ public class StripeWebhookService {
                     resolvedEventId = handledEventId;
                 }
             } else if ("payment_intent.succeeded".equals(eventType)
-                    || "payment_intent.payment_failed".equals(eventType)) {
+                    || "payment_intent.payment_failed".equals(eventType)
+                    || "payment_intent.requires_action".equals(eventType)
+                    || "payment_intent.processing".equals(eventType)) {
                 UUID handledEventId = handlePaymentIntent(root, payload, metadata);
                 if (handledEventId != null) {
                     resolvedEventId = handledEventId;
@@ -404,7 +406,9 @@ public class StripeWebhookService {
         }
 
         if ("payment_intent.succeeded".equals(eventType)
-                || "payment_intent.payment_failed".equals(eventType)) {
+                || "payment_intent.payment_failed".equals(eventType)
+                || "payment_intent.requires_action".equals(eventType)
+                || "payment_intent.processing".equals(eventType)) {
             return extractTrackingEventIdFromMetadata(objectNode.path("metadata"));
         }
 

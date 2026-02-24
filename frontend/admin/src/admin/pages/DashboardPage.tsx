@@ -13,6 +13,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent'
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip'
 
 import { KpiCard } from '@/admin/components/dashboard/KpiCard'
 import { ChartCard } from '@/admin/components/dashboard/ChartCard'
@@ -28,7 +30,24 @@ import { useDashboardStats } from '@/admin/hooks/useDashboardStats'
 import { normalizeHttpError } from '@/admin/services/apiClient'
 import { formatCurrency } from '@/lib/utils'
 
-const PIE_COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b97b5']
+const STATUS_COLOR_MAP: Record<string, string> = {
+  SUCCESS: '#34d399',
+  FAILED: '#f87171',
+  PENDING: '#fbbf24',
+  UNKNOWN: '#94a3b8',
+  SENT: '#60a5fa',
+  ERROR: '#f87171',
+}
+
+const TOOLTIP_STYLE = {
+  backgroundColor: 'rgba(2, 6, 23, 0.96)',
+  border: '1px solid #334155',
+  borderRadius: '8px',
+  boxShadow: '0 10px 25px rgba(2, 6, 23, 0.6)',
+}
+
+const TOOLTIP_LABEL_STYLE = { color: '#f8fafc', fontWeight: 700 }
+const TOOLTIP_ITEM_STYLE = { color: '#e2e8f0' }
 
 function toIso(value: string) {
   if (!value) {
@@ -121,7 +140,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                   <XAxis dataKey="date" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" />
-                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                   <Line type="monotone" dataKey="revenue" stroke="#22d3ee" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -137,11 +156,11 @@ export function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={chartData} dataKey="total" nameKey="status" innerRadius={50} outerRadius={90}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={entry.status} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    {chartData.map((entry) => (
+                      <Cell key={entry.status} fill={resolveStatusColor(entry.status)} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                  <Tooltip content={StatusPieTooltip} />
                 </PieChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -161,7 +180,7 @@ export function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                   <XAxis dataKey="name" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" />
-                  <Tooltip contentStyle={{ backgroundColor: '#0b1020', border: '1px solid #23324f' }} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                   <Bar dataKey="value" fill="#22d3ee" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -201,5 +220,26 @@ export function DashboardPage() {
         </div>
       ) : null}
     </section>
+  )
+}
+
+function resolveStatusColor(status: string) {
+  return STATUS_COLOR_MAP[status.toUpperCase()] ?? '#60a5fa'
+}
+
+function StatusPieTooltip({ active, payload }: TooltipContentProps<ValueType, NameType>) {
+  if (!active || !payload || payload.length === 0) {
+    return null
+  }
+
+  const row = payload[0]
+  const label = typeof row.name === 'string' ? row.name.toUpperCase() : String(row.name ?? 'UNKNOWN').toUpperCase()
+  const total = typeof row.value === 'number' ? row.value : Number(row.value ?? 0)
+
+  return (
+    <div className="rounded-md border border-slate-600 bg-slate-950/95 px-3 py-2 shadow-xl shadow-black/40">
+      <p className="text-xs font-semibold tracking-wide text-slate-300">{label}</p>
+      <p className="text-sm font-bold text-white">{Number.isNaN(total) ? 0 : total}</p>
+    </div>
   )
 }
