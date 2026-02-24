@@ -549,7 +549,8 @@ public class StripeWebhookService {
         if ("FAILED".equals(normalized)
                 || "CANCELED".equals(normalized)
                 || "CANCELLED".equals(normalized)
-                || "UNPAID".equals(normalized)) {
+                || "UNPAID".equals(normalized)
+                || "REQUIRES_PAYMENT_METHOD".equals(normalized)) {
             return "FAILED";
         }
 
@@ -557,7 +558,6 @@ public class StripeWebhookService {
                 || "REQUIRES_ACTION".equals(normalized)
                 || "REQUIRES_CONFIRMATION".equals(normalized)
                 || "REQUIRES_CAPTURE".equals(normalized)
-                || "REQUIRES_PAYMENT_METHOD".equals(normalized)
                 || "PENDING".equals(normalized)
                 || "OPEN".equals(normalized)
                 || "UNKNOWN".equals(normalized)) {
@@ -645,21 +645,21 @@ public class StripeWebhookService {
             String customerEmail,
             String customerName
     ) {
-        if (orderRecord.getEventId() == null) {
+        UUID eventId = orderRecord.getEventId();
+        if (eventId == null) {
             log.warn("stripe_order success_deferred_missing_event_id stripeSessionId={} paymentIntentId={}",
                     orderRecord.getStripeSessionId(), orderRecord.getPaymentIntentId());
-            return;
+        } else {
+            trackingService.recordPurchaseEvent(
+                    eventId,
+                    orderRecord.getAmount(),
+                    orderRecord.getCurrency(),
+                    rawPayload
+            );
         }
 
-        trackingService.recordPurchaseEvent(
-                orderRecord.getEventId(),
-                orderRecord.getAmount(),
-                orderRecord.getCurrency(),
-                rawPayload
-        );
-
         PurchaseIntegrationPayload integrationPayload = new PurchaseIntegrationPayload(
-                orderRecord.getEventId(),
+                eventId,
                 orderRecord.getStripeSessionId(),
                 orderRecord.getAmount(),
                 orderRecord.getCurrency(),
