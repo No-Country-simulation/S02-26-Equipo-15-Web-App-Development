@@ -9,7 +9,8 @@ import { useAdminAuth } from '@/admin/hooks/useAdminAuth'
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, login } = useAdminAuth()
+  const { isAuthenticated, isLoggingIn, login } = useAdminAuth()
+  const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
@@ -17,9 +18,10 @@ export function LoginPage() {
     return <Navigate to="/admin/dashboard" replace />
   }
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const result = login(password)
+    setError('')
+    const result = await login(username, password)
     if (!result.ok) {
       setError(result.message ?? 'No autorizado')
       return
@@ -35,13 +37,28 @@ export function LoginPage() {
             <LockKeyhole className="h-5 w-5" />
           </div>
           <CardTitle>Admin Login</CardTitle>
-          <CardDescription>Acceso demo para panel de observabilidad NoCountry.</CardDescription>
+          <CardDescription>Acceso protegido con credenciales del backend.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
+              <label htmlFor="username" className="text-sm text-muted">
+                Usuario
+              </label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="admin"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
               <label htmlFor="password" className="text-sm text-muted">
-                Password demo
+                Password
               </label>
               <Input
                 id="password"
@@ -49,14 +66,15 @@ export function LoginPage() {
                 placeholder="Ingresa password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
                 required
               />
             </div>
 
             {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-            <Button type="submit" className="w-full">
-              Ingresar
+            <Button type="submit" className="w-full" disabled={isLoggingIn}>
+              {isLoggingIn ? 'Validando...' : 'Ingresar'}
             </Button>
           </form>
         </CardContent>
