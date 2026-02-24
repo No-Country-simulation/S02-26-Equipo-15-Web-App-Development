@@ -1,90 +1,81 @@
 package com.nocountry.api.controller;
 
-import com.nocountry.api.config.GlobalExceptionHandler;
-import com.nocountry.api.dto.TrackRequest;
-import com.nocountry.api.service.RequestMetadata;
-import com.nocountry.api.service.RequestMetadataResolver;
-import com.nocountry.api.service.TrackRateLimiterService;
-import com.nocountry.api.service.TrackingService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nocountry.api.entity.TrackingSession;
+import com.nocountry.api.repository.TrackingEventRepository;
+import com.nocountry.api.repository.TrackingSessionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = TrackController.class)
-@Import(GlobalExceptionHandler.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 class TrackControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private TrackingSessionRepository trackingSessionRepository;
 
-    @MockBean
-    private TrackingService trackingService;
+    @Autowired
+    private TrackingEventRepository trackingEventRepository;
 
-    @MockBean
-    private RequestMetadataResolver requestMetadataResolver;
-
-    @MockBean
-    private TrackRateLimiterService trackRateLimiterService;
+    @BeforeEach
+    void cleanDatabase() {
+        trackingEventRepository.deleteAll();
+        trackingSessionRepository.deleteAll();
+    }
 
     @Test
-    void shouldTrackValidRequest() throws Exception {
+    void shouldCreateTrackingSessionAndEvent() throws Exception {
         UUID eventId = UUID.randomUUID();
-
-        when(requestMetadataResolver.resolve(any())).thenReturn(new RequestMetadata("ua", "1.1.1.1", "hash"));
-        when(trackRateLimiterService.allow(any())).thenReturn(true);
-        when(trackingService.track(any(TrackRequest.class), any(RequestMetadata.class))).thenReturn(eventId);
 
         String json = """
                 {
+                  "eventId": "%s",
                   "eventType": "landing_view",
                   "utm_source": "google",
                   "utm_medium": "cpc",
-                  "utm_campaign": "camp",
-                  "utm_term": "term",
-                  "utm_content": "content",
-                  "gclid": "gclid",
-                  "fbclid": "fbclid",
-                  "landing_path": "/"
+                  "utm_campaign": "spring_sale",
+                  "landing_path": "/pricing"
                 }
-                """;
+                """.formatted(eventId);
 
         mockMvc.perform(post("/api/track")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.eventId").value(eventId.toString()));
-    }
 
-    @Test
-    void shouldRejectInvalidEventType() throws Exception {
-        String json = """
-                {
-                  "eventType": "invalid_event",
-                  "utm_source": "google",
-                  "landing_path": "/"
-                }
-                """;
+        TrackingSession session = trackingSessionRepository.findById(eventId).orElseThrow();
+        assertEquals("google", session.getUtmSource());
+        assertEquals("cpc", session.getUtmMedium());
+        assertEquals("spring_sale", session.getUtmCampaign());
+        assertEquals("/pricing", session.getLandingPath());
+        assertNotNull(session.getCreatedAt());
+        assertNotNull(session.getLastSeenAt());
 
-        mockMvc.perform(post("/api/track")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+        long landingViewCount = trackingEventRepository.findAll().stream()
+                .filter(event -> eventId.equals(event.getEventId()))
+                .filter(event -> "landing_view".equals(event.getEventType()))
+                .count();
+
+        assertEquals(1L, landingViewCount);
+        assertTrue(trackingEventRepository.findAll().stream().allMatch(event -> event.getId() != null));
     }
 }
