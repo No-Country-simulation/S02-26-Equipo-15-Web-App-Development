@@ -4,35 +4,21 @@
 
 # NoCountry Growth Observability Platform
 
-Plataforma end-to-end para convertir trafico en ventas medibles, uniendo marketing attribution, pagos en Stripe y trazabilidad operativa en un panel admin.
+Plataforma para attribution y conversion server-side: captura trafico con contexto de campana, correlaciona pagos Stripe con `eventId` y expone trazabilidad operativa en un panel admin con metricas de negocio.
 
-## Resumen ejecutivo
+## Estado actual / MVP
 
-Este proyecto resuelve un problema real de growth y operacion:
+- [x] Landing (`frontend/landing`): captura UTM y dispara eventos de funnel.
+- [x] Admin panel (`frontend/admin`): consulta sesiones, eventos, ordenes y estado de integraciones.
+- [x] Backend API (`backend`): tracking, Stripe webhook idempotente, auth admin Basic.
+- [x] Base de datos (`BDD` + Flyway): esquema versionado para `tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`, `integrations_log`.
 
-- Captura demanda (Google/Meta) con contexto de campana.
-- Correlaciona todo con un `eventId` unico desde landing hasta pago.
-- Confirma conversiones con datos de servidor (GA4 MP y Meta CAPI), no solo con pixel cliente.
-- Expone trazabilidad auditable para negocio, producto y operaciones.
+## Componentes
 
-En una frase: pasamos de "clicks sin contexto" a "ingresos explicables por sesion".
-
-## Problema de negocio
-
-En funnels tradicionales, los equipos suelen tener:
-
-- Datos fragmentados entre landing, Stripe y plataformas de anuncios.
-- Dudas sobre que conversion es real vs estimada por pixel.
-- Poco contexto para explicar por que sube o cae la conversion.
-
-Esta plataforma cierra esa brecha con una capa de observabilidad de conversion orientada a decisiones de negocio.
-
-## Propuesta de valor para NotCountry
-
-- Menor friccion comercial: medicion clara del journey completo.
-- Mayor confianza: deduplicacion e idempotencia en pagos/webhooks.
-- Mejor operacion: panel para auditar sesiones, eventos, estado de pago e integraciones.
-- Escalabilidad: arquitectura modular con frontends separados y backend desacoplado.
+- Landing: [`frontend/landing`](./frontend/landing)
+- Admin panel: [`frontend/admin`](./frontend/admin)
+- Backend API: [`backend`](./backend)
+- Base de datos + esquema: [`BDD`](./BDD)
 
 ## Arquitectura de alto nivel
 
@@ -94,68 +80,59 @@ sequenceDiagram
   API-->>AD: trazabilidad completa por eventId
 ```
 
-## Indicadores clave (KPI)
+## Links
 
-- Funnel principal: `landing_view -> click_cta -> begin_checkout -> purchase`
-- Tasa de conversion por fuente de campana
-- Revenue confirmado por rango de fechas
-- Distribucion de estado de negocio: `SUCCESS | PENDING | FAILED | UNKNOWN`
-- Estado de integraciones: `GA4_MP` y `META_CAPI`
-
-## Estado del MVP
-
-Completado y operativo:
-
-- Landing con tracking de atribucion.
-- Backend con Stripe webhook e idempotencia.
-- Integracion server-side con GA4 MP y Meta CAPI.
-- Admin con sesiones, eventos, metricas y trazabilidad.
-- Modelo de datos versionado con Flyway.
-
-Siguiente foco recomendado:
-
-- Hardening de auth/admin.
-- Alertas y observabilidad operativa.
-- Pruebas E2E automatizadas de checkout y webhooks.
-
-## Estructura del repositorio
-
-```text
-/
-|-- backend/                 # API Spring Boot (Java 17)
-|-- frontend/
-|   |-- landing/             # Landing de conversion
-|   `-- admin/               # Panel observability
-|-- infra/                   # Arquitectura y diagramas
-|-- BDD/                     # Modelo de datos y scripts SQL
-`-- README.md
-```
+| Recurso | URL |
+|---|---|
+| Landing deploy | https://s02-26-equipo-15-web-app-developmen.vercel.app/ |
+| Admin deploy | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
+| API base URL | https://s02-26-equipo-15-web-app-development-desarrollo.up.railway.app |
+| Health check | https://s02-26-equipo-15-web-app-development-desarrollo.up.railway.app/actuator/health |
+| Swagger | No habilitado en deploy actual |
 
 ## Levantar en local
 
 ```bash
-# Backend
+# Backend (http://localhost:8080)
 cd backend
 mvn spring-boot:run
 
-# Landing
+# Landing (http://localhost:5173)
 cd ../frontend/landing
 npm install
 npm run dev
 
-# Admin
+# Admin (http://localhost:5174 o puerto libre de Vite)
 cd ../admin
 npm install
 npm run dev
 ```
 
+## Integraciones
+
+- Stripe webhook: procesamiento idempotente por `stripeEventId` y actualizacion de `orders.business_status`.
+- GA4 Measurement Protocol: envio server-side de `purchase` cuando corresponde.
+- Meta CAPI: envio server-side de conversion para consistencia de atribucion.
+- Pipedrive: integracion existente por feature flag (`PIPEDRIVE_ENABLED`), deshabilitada por defecto hasta contar con token y definicion final de pipeline comercial.
+
+## KPIs / metricas del dashboard
+
+- Sesiones y eventos por rango.
+- Ordenes y revenue.
+- Distribucion de `orders.business_status` (`SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`).
+- Conversion del funnel (`landing_view`, `click_cta`, `begin_checkout`, `purchase`).
+- Estado de `Integrations log` por `eventId`.
+
+## Roadmap
+
+- Endurecer observabilidad operativa y alertas de webhooks/integraciones.
+- Incorporar pruebas E2E de checkout y trazabilidad completa.
+- Cerrar rollout de Pipedrive en produccion.
+
 ## Documentacion por modulo
 
-- `backend/README.md`
-- `frontend/landing/README.md`
-- `frontend/admin/README.md`
-- `infra/arquitectura_end-to-end.md`
-- `infra/modelo_bdd.md`
-- `infra/resumen_end_to_end.md`
-- `BDD/README.md`
-- `BDD/descripcion_bdd.md`
+- [`backend/README.md`](./backend/README.md)
+- [`frontend/landing/README.md`](./frontend/landing/README.md)
+- [`frontend/admin/README.md`](./frontend/admin/README.md)
+- [`BDD/README.md`](./BDD/README.md)
+- [`infra/arquitectura_end-to-end.md`](./infra/arquitectura_end-to-end.md)
