@@ -14,7 +14,6 @@ API de tracking y pagos con Spring Boot 3 (Java 17).
 - Integraciones server-side por feature flag:
   - Meta CAPI
   - GA4 Measurement Protocol
-  - Pipedrive (opcional)
 - Endpoints admin de lectura (`/api/admin/*`).
 - CORS configurable.
 - Manejo global de errores.
@@ -64,6 +63,7 @@ Eventos permitidos: `landing_view`, `click_cta`, `begin_checkout`, `purchase`.
 - `tracking_event`
 - `orders`
   - incluye `business_status` canonico (`SUCCESS|PENDING|FAILED|UNKNOWN`)
+  - contempla estados intermedios de pago (ej: `UNPAID` mapeado a `PENDING`)
 - `stripe_webhook_event`
   - incluye `event_id` para correlacion con sesion
 - `integrations_log`
@@ -78,6 +78,8 @@ Eventos permitidos: `landing_view`, `click_cta`, `begin_checkout`, `purchase`.
 - `V5__orders_payment_intent_unique.sql`
 - `V6__stripe_webhook_event_add_event_id.sql`
 - `V7__orders_add_business_status.sql`
+- `V8__orders_fix_requires_payment_method_business_status.sql`
+- `V9__orders_unpaid_business_status_pending.sql`
 
 ## Variables de entorno
 
@@ -92,8 +94,6 @@ Eventos permitidos: `landing_view`, `click_cta`, `begin_checkout`, `purchase`.
 - `GA4_MEASUREMENT_ID`
 - `GA4_API_SECRET`
 - `GA4_MP_DEBUG_VALIDATION_ENABLED=true|false`
-- `PIPEDRIVE_ENABLED=true|false`
-- `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174`
 
 ## Notas Stripe webhook

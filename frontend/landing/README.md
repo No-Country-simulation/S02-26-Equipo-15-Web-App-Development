@@ -2,6 +2,12 @@
 
 Landing de conversion con tracking client-side y redireccion a Stripe Checkout.
 
+## Objetivo en el funnel
+
+- Capturar demanda con contexto de atribucion (`utm_*`, `gclid`, `fbclid`).
+- Generar `eventId` para correlacionar navegacion y pago.
+- Enviar senales cliente (GA4/Meta Pixel) y dejar trazabilidad para confirmacion server-side.
+
 ## Requisitos
 
 - Node 18+
@@ -54,6 +60,19 @@ En Vercel, configurar estas variables por entorno y redeployar.
 - `trackPageView(path?)` -> GA4 `page_view`, Meta `PageView`
 - `trackCTA({ eventId, label })` -> GA4 `click_cta`, Meta `ClickCTA`
 - `trackBeginCheckout({ value, currency, eventId })` -> GA4 `begin_checkout`, Meta `InitiateCheckout`
+
+## Pruebas utiles de checkout (Stripe test mode)
+
+- Pago rechazado (tarjeta): `4000 0000 0000 0002`
+- Fondos insuficientes: `4000 0000 0000 9995`
+- 3DS requerido (flujo intermedio): `4000 0000 0000 3220`
+- Pago con Cuenta bancaria de EE.UU. (ACH, flujo asincrono):
+  - Selecciona `Cuenta bancaria de EE.UU.` en checkout.
+  - Conecta una cuenta de prueba (por ejemplo `Success` en el modal de test).
+  - Al confirmar `Pagar`, el primer estado puede llegar como `UNPAID` y en nuestro sistema se muestra como `PENDING`.
+  - Luego, con webhooks posteriores, ese mismo `eventId` puede pasar a `SUCCESS` o `FAILED`.
+
+Nota: el estado en admin depende del webhook procesado por backend y su normalizacion a `business_status`.
 
 ## Debug rapido
 
