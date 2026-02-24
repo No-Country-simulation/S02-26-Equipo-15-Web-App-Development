@@ -21,11 +21,6 @@ const PAGE_SIZE = 30
 const columns: ColumnDef<EventsTableRow>[] = [
   { accessorKey: 'eventType', header: 'eventType' },
   { accessorKey: 'landingPath', header: 'landing_path' },
-  { accessorKey: 'utmSource', header: 'utm_source' },
-  { accessorKey: 'utmMedium', header: 'utm_medium' },
-  { accessorKey: 'utmCampaign', header: 'utm_campaign' },
-  { accessorKey: 'gclid', header: 'gclid' },
-  { accessorKey: 'fbclid', header: 'fbclid' },
   {
     accessorKey: 'eventId',
     header: 'eventId',

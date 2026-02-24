@@ -31,11 +31,6 @@ const columns: ColumnDef<SessionTableRow>[] = [
     header: 'Fecha',
     cell: ({ row }) => <span>{formatDateTime(row.original.createdAt)}</span>,
   },
-  { accessorKey: 'utmSource', header: 'utm_source' },
-  { accessorKey: 'utmMedium', header: 'utm_medium' },
-  { accessorKey: 'utmCampaign', header: 'utm_campaign' },
-  { accessorKey: 'gclid', header: 'gclid' },
-  { accessorKey: 'fbclid', header: 'fbclid' },
   {
     accessorKey: 'businessStatus',
     header: 'business_status',
