@@ -10,13 +10,7 @@ erDiagram
     uuid event_id PK
     timestamp created_at
     timestamp last_seen_at
-    varchar utm_source
-    varchar utm_medium
-    varchar utm_campaign
-    varchar utm_term
-    varchar utm_content
-    varchar gclid
-    varchar fbclid
+    varchar attribution_context
     varchar landing_path
     varchar user_agent
     varchar ip_hash
@@ -86,8 +80,7 @@ Tabla de sesion/attribution por `event_id`.
 | `event_id` | `uuid` | No | PK |
 | `created_at` | `timestamp` | No | primera vez vista |
 | `last_seen_at` | `timestamp` | No | ultima actividad |
-| `utm_source`..`utm_content` | `varchar(255)` | Si | first-touch |
-| `gclid`, `fbclid` | `varchar(255)` | Si | first-touch |
+| `attribution_context` | `varchar(255)` | Si | first-touch (resumen) |
 | `landing_path` | `varchar(1024)` | Si | ruta de entrada |
 | `user_agent` | `varchar(1024)` | Si | metadata request |
 | `ip_hash` | `varchar(64)` | Si | hash de IP |

@@ -10,7 +10,7 @@ Plataforma end-to-end para convertir trafico en ventas medibles, uniendo marketi
 
 Este proyecto resuelve un problema real de growth y operacion:
 
-- Captura demanda (Google/Meta) con contexto de campana (`utm_*`, `gclid`, `fbclid`).
+- Captura demanda (Google/Meta) con contexto de campana.
 - Correlaciona todo con un `eventId` unico desde landing hasta pago.
 - Confirma conversiones con datos de servidor (GA4 MP y Meta CAPI), no solo con pixel cliente.
 - Expone trazabilidad auditable para negocio, producto y operaciones.
@@ -69,7 +69,7 @@ sequenceDiagram
   participant META as Meta CAPI
   participant AD as Admin
 
-  U->>L: Visita landing con UTM/gclid/fbclid
+  U->>L: Visita landing
   L->>API: /api/track (landing_view)
   API->>DB: upsert tracking_session + insert tracking_event
   API-->>L: eventId
@@ -97,7 +97,7 @@ sequenceDiagram
 ## Indicadores clave (KPI)
 
 - Funnel principal: `landing_view -> click_cta -> begin_checkout -> purchase`
-- Tasa de conversion por fuente (`utm_source` / `utm_campaign`)
+- Tasa de conversion por fuente de campana
 - Revenue confirmado por rango de fechas
 - Distribucion de estado de negocio: `SUCCESS | PENDING | FAILED | UNKNOWN`
 - Estado de integraciones: `GA4_MP` y `META_CAPI`
