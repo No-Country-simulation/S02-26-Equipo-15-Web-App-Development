@@ -1,27 +1,10 @@
 # Landing (React + Vite)
 
-Landing de conversion con tracking client-side y redireccion a Stripe Checkout.
+Landing de conversion que captura UTM, dispara eventos de funnel y conserva `eventId` para correlacionar navegacion y pago.
 
-## Objetivo en el funnel
+## Deploy
 
-- Capturar demanda con contexto de atribucion.
-- Generar `eventId` para correlacionar navegacion y pago.
-- Enviar senales cliente (GA4/Meta Pixel) y dejar trazabilidad para confirmacion server-side.
-
-## Requisitos
-
-- Node 18+
-- npm 9+
-
-## Ejecutar local
-
-```bash
-cd frontend/landing
-npm install
-npm run dev
-```
-
-App local: `http://localhost:5173`
+- https://s02-26-equipo-15-web-app-developmen.vercel.app/
 
 ## Variables de entorno
 
@@ -31,56 +14,41 @@ Crear `.env` desde `.env.example`:
 cp .env.example .env
 ```
 
-Variables usadas:
+Variables clave:
 
 ```env
-VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 VITE_API_URL=http://localhost:8080
-# Compat: tambien acepta VITE_API_BASE
+VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 VITE_META_PIXEL_ID=123456789012345
 ```
 
-En Vercel, configurar estas variables por entorno y redeployar.
+## Eventos que dispara
 
-## Comportamiento de tracking
+- `landing_view`
+- `click_cta`
+- `begin_checkout`
+- `purchase` (confirmado server-side desde backend/webhook)
 
-- En cada carga de la landing se genera un `eventId` nuevo.
-- Se envia `landing_view` a backend en `POST /api/track` con ese `eventId`.
-- El backend puede devolver un `eventId` y el frontend lo conserva para los eventos siguientes de esa visita.
-- Al hacer click en CTA:
-  - envia `click_cta` y `begin_checkout` (GA4 + Meta Pixel)
-  - redirige a Stripe con:
-    - `client_reference_id=<eventId>`
-    - `nc_event_id=<eventId>` (compat legacy)
-    - contexto de campana
+Notas:
 
-## Eventos client-side
+- `eventId` se envia a backend por `POST /api/track`.
+- En checkout se propaga a Stripe (`client_reference_id`) para correlacionar con webhook.
 
-- `trackPageView(path?)` -> GA4 `page_view`, Meta `PageView`
-- `trackCTA({ eventId, label })` -> GA4 `click_cta`, Meta `ClickCTA`
-- `trackBeginCheckout({ value, currency, eventId })` -> GA4 `begin_checkout`, Meta `InitiateCheckout`
+## Correr local
 
-## Pruebas utiles de checkout (Stripe test mode)
+```bash
+cd frontend/landing
+npm install
+npm run dev
+```
 
-- Pago rechazado (tarjeta): `4000 0000 0000 0002`
-- Fondos insuficientes: `4000 0000 0000 9995`
-- 3DS requerido (flujo intermedio): `4000 0000 0000 3220`
-- Pago con Cuenta bancaria de EE.UU. (ACH, flujo asincrono):
-  - Selecciona `Cuenta bancaria de EE.UU.` en checkout.
-  - Conecta una cuenta de prueba (por ejemplo `Success` en el modal de test).
-  - Al confirmar `Pagar`, el primer estado puede llegar como `UNPAID` y en nuestro sistema se muestra como `PENDING`.
-  - Luego, con webhooks posteriores, ese mismo `eventId` puede pasar a `SUCCESS` o `FAILED`.
+- URL local: `http://localhost:5173`.
 
-Nota: el estado en admin depende del webhook procesado por backend y su normalizacion a `business_status`.
+## Build
 
-## Debug rapido
-
-- DevTools > Network:
-  - GA4: filtrar `collect?v=2`
-  - Meta: filtrar `tr?id=`
-- Console:
-  - validar `import.meta.env.VITE_GA_MEASUREMENT_ID`
-  - validar `import.meta.env.VITE_META_PIXEL_ID`
-
-Si cambias `.env`, reinicia `npm run dev`.
+```bash
+cd frontend/landing
+npm run build
+npm run preview
+```

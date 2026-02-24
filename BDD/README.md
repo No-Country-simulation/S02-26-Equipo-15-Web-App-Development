@@ -1,50 +1,33 @@
 # BDD
 
-Documentacion y scripts de apoyo para base de datos.
+Documentacion y apoyo del modelo de base de datos usado por el backend.
 
-## Contenido
+## Que contiene esta carpeta
 
-- `BDD/descripcion_bdd.md`: descripcion funcional y tecnica del modelo de datos actual.
-- `BDD/pgcrypto.sql`: script bootstrap del esquema actual (tablas + indices + constraints operativas).
+- `descripcion_bdd.md`: descripcion funcional y tecnica del modelo.
+- `pgcrypto.sql`: script de apoyo para bootstrap/local.
 
-## Fuente de verdad del esquema actual
+## Tablas principales del dominio
 
-El esquema vigente se define en:
+- `tracking_session`
+- `tracking_event`
+- `orders` (incluye `orders.business_status`)
+- `stripe_webhook_event`
+- `integrations_log`
 
-- `backend/src/main/resources/db/migration/V1__init.sql`
-- `backend/src/main/resources/db/migration/V2__integrations_log.sql`
-- `backend/src/main/resources/db/migration/V3__normalize_integrations_log_jsonb.sql`
-- `backend/src/main/resources/db/migration/V4__drop_legacy_tables.sql`
-- `backend/src/main/resources/db/migration/V5__orders_payment_intent_unique.sql`
-- `backend/src/main/resources/db/migration/V6__stripe_webhook_event_add_event_id.sql`
-- `backend/src/main/resources/db/migration/V7__orders_add_business_status.sql`
-- `backend/src/main/resources/db/migration/V8__orders_fix_requires_payment_method_business_status.sql`
-- `backend/src/main/resources/db/migration/V9__orders_unpaid_business_status_pending.sql`
+## Versionado del esquema (Flyway)
 
-## Uso rapido
+La fuente de verdad del esquema es Flyway en:
 
-- Crear esquema actual en una base vacia:
-  - `psql -h <host> -U <user> -d <db> -f BDD/pgcrypto.sql`
-- Revisar descripcion funcional del modelo:
-  - `BDD/descripcion_bdd.md`
-- Revisar resumen tecnico del modelo:
-  - `infra/modelo_bdd.md`
+- `backend/src/main/resources/db/migration`
 
-Nota: para ambientes reales, aplicar siempre migraciones Flyway; `BDD/pgcrypto.sql` es apoyo para bootstrap/local.
+Versiones actuales:
 
-## Convencion de terminologia
+- `V1` a `V9` (inicial + ajustes de `orders`, `stripe_webhook_event` e `integrations_log`).
 
-- `GA4`: Google Analytics 4 (client-side).
-- `GA4_MP`: Google Analytics 4 Measurement Protocol (server-side).
-- `META_CAPI`: Meta Conversions API (server-side).
+## Relacion con backend
 
-## Reglas operativas clave
+- Backend README: `backend/README.md`
+- Resumen tecnico: `infra/modelo_bdd.md`
 
-- Idempotencia de pagos:
-  - `orders.stripe_session_id` es unico.
-  - `orders.payment_intent_id` es unico (indice parcial cuando no es null).
-  - `stripe_webhook_event.stripe_event_id` evita reprocesar el mismo webhook.
-- Estado de negocio canonico (`orders.business_status`):
-  - `SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`.
-- Regla intermedia incorporada:
-  - combinacion `status = UNPAID` se normaliza a `business_status = PENDING`.
+Nota: para ambientes reales, aplicar migraciones Flyway; `pgcrypto.sql` se usa como apoyo en escenarios de bootstrap/local.
