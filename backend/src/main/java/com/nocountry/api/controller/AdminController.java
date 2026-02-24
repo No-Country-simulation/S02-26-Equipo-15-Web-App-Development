@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Validated
@@ -29,6 +30,11 @@ public class AdminController {
 
     public AdminController(AdminQueryService adminQueryService) {
         this.adminQueryService = adminQueryService;
+    }
+
+    @GetMapping("/health")
+    public Map<String, Boolean> health() {
+        return Map.of("ok", true);
     }
 
     @GetMapping("/sessions")

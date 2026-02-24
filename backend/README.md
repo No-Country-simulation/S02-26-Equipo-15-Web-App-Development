@@ -15,18 +15,20 @@ API de tracking y pagos con Spring Boot 3 (Java 17).
   - Meta CAPI
   - GA4 Measurement Protocol
 - Endpoints admin de lectura (`/api/admin/*`).
+- Autenticacion HTTP Basic para `/api/admin/**` (rol `ADMIN`).
 - CORS configurable.
 - Manejo global de errores.
 - Rate limit in-memory para `/api/track`.
 
 ## Endpoints
 
-- `POST /api/track`
-- `POST /api/stripe/webhook`
-- `GET /api/admin/sessions`
-- `GET /api/admin/sessions/{eventId}`
-- `GET /api/admin/events`
-- `GET /api/admin/metrics`
+- `POST /api/track` (publico, sin auth)
+- `POST /api/stripe/webhook` (publico, sin auth)
+- `GET /api/admin/health` (protegido, requiere Basic Auth ADMIN)
+- `GET /api/admin/sessions` (protegido, requiere Basic Auth ADMIN)
+- `GET /api/admin/sessions/{eventId}` (protegido, requiere Basic Auth ADMIN)
+- `GET /api/admin/events` (protegido, requiere Basic Auth ADMIN)
+- `GET /api/admin/metrics` (protegido, requiere Basic Auth ADMIN)
 - `GET /api/health/db`
 - `GET /actuator/health`
 
@@ -91,6 +93,49 @@ Eventos permitidos: `landing_view`, `click_cta`, `begin_checkout`, `purchase`.
 - `GA4_API_SECRET`
 - `GA4_MP_DEBUG_VALIDATION_ENABLED=true|false`
 - `CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174`
+- `ADMIN_USER` (usuario admin para Basic Auth)
+- `ADMIN_PASS` (password admin para Basic Auth)
+
+## Autenticacion Admin (HTTP Basic)
+
+- Rutas protegidas: todo `/api/admin/**`.
+- Usuario/clave se toman de `ADMIN_USER` y `ADMIN_PASS`.
+- Defaults solo para desarrollo local (`profile=local|dev`) cuando faltan variables:
+  - `ADMIN_USER=admin`
+  - `ADMIN_PASS=admin123`
+- Fuera de `local|dev`, si `ADMIN_PASS` no esta definido, la app **no rompe el arranque**:
+  - se crea una clave aleatoria interna en memoria y el acceso admin queda bloqueado hasta configurar `ADMIN_PASS`.
+  - no se imprime `ADMIN_PASS` en logs.
+
+### Ejemplos curl
+
+Sin credenciales (debe dar `401`):
+
+```bash
+curl -i http://localhost:8080/api/admin/health
+```
+
+Con Basic Auth valido (debe dar `200`):
+
+```bash
+curl -i -u "$ADMIN_USER:$ADMIN_PASS" http://localhost:8080/api/admin/health
+```
+
+Endpoint publico `/api/track`:
+
+```bash
+curl -i -X POST http://localhost:8080/api/track \
+  -H "Content-Type: application/json" \
+  -d '{"eventType":"landing_view","landing_path":"/"}'
+```
+
+Endpoint publico `/api/stripe/webhook`:
+
+```bash
+curl -i -X POST http://localhost:8080/api/stripe/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"id":"evt_test"}'
+```
 
 ## Notas Stripe webhook
 
@@ -105,6 +150,26 @@ cd backend
 mvn -q -DskipTests package
 mvn spring-boot:run
 ```
+
+## Ejecutar tests
+
+```bash
+cd backend
+mvn test
+```
+
+Perfil usado en integracion:
+
+- `test` (`src/test/resources/application-test.yml`)
+- DB en memoria H2 (`create-drop`)
+- Flyway deshabilitado en tests
+- firma Stripe validada con secreto de test (`app.stripe.webhook-secret=test_webhook_secret`)
+
+Cobertura clave incluida:
+
+- `TrackControllerTest`: `POST /api/track` persiste `tracking_session` y `tracking_event`.
+- `StripeWebhookIdempotencyTest`: dos `POST /api/stripe/webhook` con mismo `event_id` no duplican `orders` ni `stripe_webhook_event`.
+- `OrderStatusTransitionTest`: flujo de `payment_intent.processing` a `checkout.session.completed` (`payment_status=paid`) actualiza la orden de `PENDING` a `PAID` (`business_status=SUCCESS`).
 
 ## Verificacion rapida
 
