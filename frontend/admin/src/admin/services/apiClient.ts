@@ -13,6 +13,8 @@ if (!hasAbsoluteApiBaseUrl) {
 }
 
 export const AUTH_STORAGE_KEY = 'nocountry_admin_token'
+export const API_BASE_URL = apiBaseUrl
+export const HAS_ABSOLUTE_API_BASE_URL = hasAbsoluteApiBaseUrl
 const INVALID_BASE_URL = 'http://invalid.local'
 
 export const apiClient = axios.create({
@@ -37,7 +39,7 @@ apiClient.interceptors.request.use((config) => {
 
   const token = window.localStorage.getItem(AUTH_STORAGE_KEY)
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+    config.headers.Authorization = token
   }
   return config
 })

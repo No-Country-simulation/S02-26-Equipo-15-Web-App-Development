@@ -32,12 +32,9 @@ Configurar:
 
 ```bash
 VITE_API_URL=http://localhost:8080
-VITE_ADMIN_DEMO_PASSWORD=nocountry-admin
 ```
 
 - `VITE_API_URL`: base URL del backend.
-- `VITE_ADMIN_DEMO_PASSWORD`: password demo para login local (opcional, default `nocountry-admin`).
-- `PASSWORD`: no es leida por Vite ni por la app admin; usar `VITE_ADMIN_DEMO_PASSWORD`.
 
 ## Ejecucion local
 
@@ -64,10 +61,13 @@ npm run preview
 - Output Directory: `dist`
 - Este directorio incluye `vercel.json` con rewrites para SPA (`/admin` y `/admin/*` -> `/index.html`), evitando 404 al entrar por URL directa.
 
-## Credenciales demo login
+## Credenciales login admin
 
-- Usuario: no requerido
-- Password: `nocountry-admin` (o el valor en `VITE_ADMIN_DEMO_PASSWORD`)
+- El login valida contra `GET /api/admin/health` usando HTTP Basic.
+- Usar el mismo usuario/password configurado en backend (`ADMIN_USER` y `ADMIN_PASS`).
+- En local, si backend corre con profile `local|dev` y no seteaste vars, los defaults son:
+  - Usuario: `admin`
+  - Password: `admin123`
 
 ## Notas funcionales
 
