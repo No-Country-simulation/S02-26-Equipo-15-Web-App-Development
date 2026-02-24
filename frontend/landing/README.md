@@ -35,6 +35,20 @@ Notas:
 - `eventId` se envia a backend por `POST /api/track`.
 - En checkout se propaga a Stripe (`client_reference_id`) para correlacionar con webhook.
 
+## Pruebas de pago (Stripe test mode)
+
+Casos utiles para validar estados en admin (`orders.business_status`):
+- `SUCCESS`(pago aceptado): tarjeta `4242 4242 4242 4242`
+- `FAILED` (pago rechazado): tarjeta `4000 0000 0000 0002`
+- `FAILED` (fondos insuficientes): tarjeta `4000 0000 0000 9995`
+- `FAILED`/intermedio (requiere accion 3DS): tarjeta `4000 0000 0000 3220`
+- `PENDING` asincrono (Cuenta bancaria de EE.UU./ACH): seleccionar metodo bancario de prueba en checkout.
+
+Notas:
+
+- Verificar que el backend reciba webhooks de Stripe para que el estado cambie en `orders`.
+- El estado final depende del evento webhook procesado (por eso un pago puede quedar `PENDING` temporalmente).
+
 ## Correr local
 
 ```bash

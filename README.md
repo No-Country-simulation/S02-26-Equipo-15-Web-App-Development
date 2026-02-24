@@ -2,9 +2,25 @@
   <img src="./infra/assets/notcountry-readme-header.svg" alt="S02-26-Equipo 15 - Web App Development" width="100%" />
 </p>
 
-# NoCountry Growth Observability Platform
 
-Plataforma para attribution y conversion server-side: captura trafico con contexto de campana, correlaciona pagos Stripe con `eventId` y expone trazabilidad operativa en un panel admin con metricas de negocio.
+# NoCountry Growth Observability Platform
+Plataforma para attribution y conversion server-side: captura trafico con contexto de campana, correlaciona pagos Stripe con `eventId` y expone trazabilidad operativa en un panel admin con metricas de negocio para optimizar inversion en ads con datos reales.
+
+## Problema
+
+Aumentar las conversiones del ecommerce.
+
+## Descripción
+
+Somos una all in one solution de incorporation, tax y bookkeeping en USA. Queremos mejorar nuestro ecommerce para dirigir tráfico con ads y mejorar la conversión. Es importante lograr que tanto Google como Meta puedan mediante el pixel hacer el conteo de los pagos que ingresan al pagar vía Stripe.
+
+## Cómo lo desarrollado resuelve el problema
+
+- Captura de atribucion desde landing con contexto UTM y `eventId` para no perder trazabilidad.
+- Correlacion de `eventId` entre navegacion, checkout y webhook para medir conversion real.
+- Procesamiento de Stripe webhook idempotente para evitar duplicados en ordenes e ingresos.
+- Confirmacion server-side de conversiones en GA4 Measurement Protocol y Meta CAPI.
+- Panel admin sobre `/api/admin/**` para auditar sesiones, eventos, revenue y `orders.business_status`.
 
 ## Estado actual / MVP
 
