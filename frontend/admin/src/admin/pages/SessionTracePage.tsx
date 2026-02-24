@@ -99,22 +99,6 @@ export function SessionTracePage() {
                   <p className="text-muted">landing_path</p>
                   <p>{detailQuery.data.session.landingPath || '-'}</p>
                 </div>
-                <div>
-                  <p className="text-muted">utm_source</p>
-                  <p>{detailQuery.data.session.utmSource || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-muted">utm_medium</p>
-                  <p>{detailQuery.data.session.utmMedium || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-muted">utm_campaign</p>
-                  <p>{detailQuery.data.session.utmCampaign || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-muted">gclid / fbclid</p>
-                  <p>{detailQuery.data.session.gclid || '-'} / {detailQuery.data.session.fbclid || '-'}</p>
-                </div>
               </CardContent>
             </Card>
 
