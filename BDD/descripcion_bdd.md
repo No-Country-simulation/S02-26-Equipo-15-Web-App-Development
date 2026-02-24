@@ -36,7 +36,7 @@ Fuente de verdad del esquema:
 
 Representa una sesion de tracking por `event_id`.
 
-- Guarda first-touch de attribution (`utm_*`, `gclid`, `fbclid`).
+- Guarda first-touch de attribution (contexto de campana).
 - Guarda metadatos de request (`user_agent`, `ip_hash`).
 - Se actualiza `last_seen_at` en cada interaccion asociada.
 

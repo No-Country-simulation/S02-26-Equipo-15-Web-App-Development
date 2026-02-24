@@ -201,6 +201,7 @@ function buildTimeline(detail: SessionDetail): TimelineItem[] {
     })
 
   detail.integrations
+    .filter((integration) => integration.integration !== 'PIPEDRIVE')
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .forEach((integration) => {
       rows.push({

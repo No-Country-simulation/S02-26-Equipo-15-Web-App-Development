@@ -49,7 +49,7 @@ sequenceDiagram
   participant GA4MP as Google Analytics 4 MP
   participant MC as Meta CAPI
 
-  U->>L: Entra con UTM/gclid/fbclid
+  U->>L: Entra a landing
   L->>API: POST /api/track (landing_view + attribution + eventId opcional)
   API->>DB: upsert tracking_session + insert tracking_event
   API-->>L: { eventId }

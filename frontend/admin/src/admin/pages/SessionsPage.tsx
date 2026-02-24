@@ -52,11 +52,6 @@ const columns: ColumnDef<SessionTableRow>[] = [
     cell: ({ row }) => <StatusChip status={row.original.metaStatus} />,
   },
   {
-    accessorKey: 'pipedriveStatus',
-    header: 'Pipedrive status',
-    cell: ({ row }) => <StatusChip status={row.original.pipedriveStatus} />,
-  },
-  {
     id: 'actions',
     header: 'Accion',
     cell: ({ row }) => (

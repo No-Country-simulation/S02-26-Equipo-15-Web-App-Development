@@ -37,15 +37,11 @@ Request:
 ```json
 {
   "eventType": "landing_view",
-  "utm_source": "...",
-  "utm_medium": "...",
-  "utm_campaign": "...",
-  "utm_term": "...",
-  "utm_content": "...",
-  "gclid": "...",
-  "fbclid": "...",
   "landing_path": "/",
-  "eventId": "optional-uuid"
+  "eventId": "optional-uuid",
+  "metadata": {
+    "campaignContext": "optional"
+  }
 }
 ```
 

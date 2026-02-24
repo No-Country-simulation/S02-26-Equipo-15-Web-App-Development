@@ -4,7 +4,7 @@ Landing de conversion con tracking client-side y redireccion a Stripe Checkout.
 
 ## Objetivo en el funnel
 
-- Capturar demanda con contexto de atribucion (`utm_*`, `gclid`, `fbclid`).
+- Capturar demanda con contexto de atribucion.
 - Generar `eventId` para correlacionar navegacion y pago.
 - Enviar senales cliente (GA4/Meta Pixel) y dejar trazabilidad para confirmacion server-side.
 
@@ -53,7 +53,7 @@ En Vercel, configurar estas variables por entorno y redeployar.
   - redirige a Stripe con:
     - `client_reference_id=<eventId>`
     - `nc_event_id=<eventId>` (compat legacy)
-    - UTM/gclid/fbclid
+    - contexto de campana
 
 ## Eventos client-side
 
