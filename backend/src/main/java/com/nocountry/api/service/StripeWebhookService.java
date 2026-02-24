@@ -135,6 +135,7 @@ public class StripeWebhookService {
         String currency = uppercaseOrDefault(text(session, "currency"), "USD");
         BigDecimal amount = amountFromMinorUnits(session.path("amount_total").asLong(0));
         String status = uppercaseOrDefault(text(session, "payment_status"), "UNKNOWN");
+        String businessStatus = toBusinessStatusFromCheckoutPaymentStatus(status);
 
         UUID eventId = extractTrackingEventId(session);
         String clientId = text(session.path("metadata"), "client_id");
@@ -150,7 +151,7 @@ public class StripeWebhookService {
                 upsertStripeSessionId(existingOrder, stripeSessionId, paymentIntentId);
                 existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
                 existingOrder.setStatus(status);
-                existingOrder.setBusinessStatus(toBusinessStatus(status));
+                existingOrder.setBusinessStatus(businessStatus);
                 existingOrder.setCurrency(currency);
                 existingOrder.setAmount(amount);
                 if (existingOrder.getEventId() == null && eventId != null) {
@@ -175,7 +176,7 @@ public class StripeWebhookService {
             boolean gainedEventId = false;
             existingOrder.setPaymentIntentId(coalesce(existingOrder.getPaymentIntentId(), paymentIntentId));
             existingOrder.setStatus(status);
-            existingOrder.setBusinessStatus(toBusinessStatus(status));
+            existingOrder.setBusinessStatus(businessStatus);
             existingOrder.setCurrency(currency);
             existingOrder.setAmount(amount);
             if (existingOrder.getEventId() == null && eventId != null) {
@@ -200,7 +201,7 @@ public class StripeWebhookService {
         orderRecord.setAmount(amount);
         orderRecord.setCurrency(currency);
         orderRecord.setStatus(status);
-        orderRecord.setBusinessStatus(toBusinessStatus(status));
+        orderRecord.setBusinessStatus(businessStatus);
         orderRecord.setCreatedAt(Instant.now(clock));
         OrderRecord persistedOrder = saveOrderResilient(orderRecord, paymentIntentId, stripeSessionId);
 
@@ -209,7 +210,7 @@ public class StripeWebhookService {
             boolean gainedEventId = false;
             persistedOrder.setPaymentIntentId(coalesce(persistedOrder.getPaymentIntentId(), paymentIntentId));
             persistedOrder.setStatus(status);
-            persistedOrder.setBusinessStatus(toBusinessStatus(status));
+            persistedOrder.setBusinessStatus(businessStatus);
             persistedOrder.setCurrency(currency);
             persistedOrder.setAmount(amount);
             if (persistedOrder.getEventId() == null && eventId != null) {
@@ -569,6 +570,20 @@ public class StripeWebhookService {
         }
 
         return "UNKNOWN";
+    }
+
+    private String toBusinessStatusFromCheckoutPaymentStatus(String checkoutPaymentStatus) {
+        if (isBlank(checkoutPaymentStatus)) {
+            return "UNKNOWN";
+        }
+
+        String normalized = checkoutPaymentStatus.toUpperCase(Locale.ROOT);
+        // Checkout session "unpaid" is typically an intermediate payment state for async methods.
+        if ("UNPAID".equals(normalized)) {
+            return "PENDING";
+        }
+
+        return toBusinessStatus(normalized);
     }
 
     private String coalesce(String current, String candidate) {
