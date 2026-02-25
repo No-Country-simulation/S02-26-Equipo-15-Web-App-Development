@@ -31,3 +31,13 @@ Versiones actuales:
 - Resumen tecnico: `infra/modelo_bdd.md`
 
 Nota: para ambientes reales, aplicar migraciones Flyway; `pgcrypto.sql` se usa como apoyo en escenarios de bootstrap/local.
+
+## Conexion de referencia (Render)
+
+- Motor: PostgreSQL
+- Puerto: `5432`
+- DB de produccion: `nocountry_rvoc`
+- Conexion backend recomendada:
+  - `SPRING_DATASOURCE_URL=jdbc:postgresql://<host-render>:5432/nocountry_rvoc?sslmode=require`
+  - `SPRING_DATASOURCE_USERNAME=<render_user>`
+  - `SPRING_DATASOURCE_PASSWORD=<render_password>`
