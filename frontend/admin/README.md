@@ -20,7 +20,7 @@ Variable requerida:
 VITE_API_URL=http://localhost:8080
 ```
 
-- `VITE_API_URL`: URL base del backend (Railway en cloud, localhost en desarrollo).
+- `VITE_API_URL`: URL base del backend (Render en cloud, localhost en desarrollo).
 
 ## Login y autenticacion
 

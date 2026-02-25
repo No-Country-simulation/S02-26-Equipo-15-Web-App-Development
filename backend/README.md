@@ -49,9 +49,18 @@ curl -i -u "$ADMIN_USER:$ADMIN_PASS" http://localhost:8080/api/admin/health
 ## Variables de entorno
 
 - Base de datos:
-  - `DATABASE_URL` o `SPRING_DATASOURCE_URL`
+  - `SPRING_DATASOURCE_URL` (requerido en server, formato JDBC)
   - `SPRING_DATASOURCE_USERNAME`
   - `SPRING_DATASOURCE_PASSWORD`
+  - `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` (fallback)
+
+Ejemplo Render (externo):
+
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://<host-render>:5432/<db>?sslmode=require
+SPRING_DATASOURCE_USERNAME=<user>
+SPRING_DATASOURCE_PASSWORD=<password>
+```
 - Seguridad admin:
   - `ADMIN_USER`
   - `ADMIN_PASS`
