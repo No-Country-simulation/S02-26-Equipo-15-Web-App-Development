@@ -53,8 +53,8 @@ export function StickyFiltersPanel({
 
       <div
         className={cn(
-          'grid overflow-hidden transition-all duration-200',
-          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+          'grid transition-all duration-200',
+          isExpanded ? 'grid-rows-[1fr] overflow-visible opacity-100' : 'grid-rows-[0fr] overflow-hidden opacity-0',
         )}
       >
         <div className="min-h-0">

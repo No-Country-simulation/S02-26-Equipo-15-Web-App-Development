@@ -63,12 +63,21 @@ const columns: ColumnDef<SessionTableRow>[] = [
   },
 ]
 
-function toIso(value: string) {
+function toIso(value: string, endOfDay = false) {
   if (!value) {
     return undefined
   }
   const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined
+  }
+
+  if (endOfDay) {
+    parsed.setHours(23, 59, 59, 999)
+  } else {
+    parsed.setHours(0, 0, 0, 0)
+  }
+  return parsed.toISOString()
 }
 
 export function SessionsPage() {
@@ -85,7 +94,7 @@ export function SessionsPage() {
 
   const { sessionsQuery, rows, isLoadingDetails } = useSessionsTableData({
     from: toIso(debouncedFrom),
-    to: toIso(debouncedTo),
+    to: toIso(debouncedTo, true),
     limit: PAGE_SIZE,
     offset,
   })
