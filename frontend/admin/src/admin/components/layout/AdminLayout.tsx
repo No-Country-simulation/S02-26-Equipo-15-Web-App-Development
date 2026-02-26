@@ -50,15 +50,35 @@ export function AdminLayout() {
 
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-[1500px] px-4 pb-6 pt-4 sm:px-6 lg:p-8">
-          <div className="mb-4 lg:hidden">
-            <Button type="button" variant="outline" onClick={() => setIsSidebarOpen(true)}>
+          <div className="mb-4 flex items-center gap-3">
+            <Button type="button" variant="outline" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="mr-2 h-4 w-4" />
               Menu
             </Button>
+            <TrackSureBrand className="ml-auto" />
           </div>
           <Outlet />
         </div>
       </main>
+    </div>
+  )
+}
+
+function TrackSureBrand({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-xl border border-[#2D8CFF]/30 bg-[#070F2B]/90 px-3 py-2 shadow-[0_0_14px_rgba(45,140,255,0.22)]',
+        className,
+      )}
+    >
+      <span className="h-2.5 w-2.5 rounded-full bg-[linear-gradient(90deg,#FF1FB3_0%,#2D8CFF_100%)] shadow-[0_0_8px_rgba(255,31,179,0.55)]" />
+      <div className="leading-none">
+        <p className="bg-[linear-gradient(90deg,#FF1FB3_0%,#2D8CFF_100%)] bg-clip-text text-sm font-extrabold tracking-[0.02em] text-transparent">
+          TrackSure
+        </p>
+        <p className="mt-1 text-[10px] font-medium tracking-wide text-[#7CB6FF]">Observability</p>
+      </div>
     </div>
   )
 }
