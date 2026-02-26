@@ -48,10 +48,13 @@ function toIso(value: string, endOfDay = false) {
     return undefined
   }
 
-  if (endOfDay) {
-    parsed.setHours(23, 59, 59, 999)
-  } else {
-    parsed.setHours(0, 0, 0, 0)
+  const hasTime = /T\d{2}:\d{2}/.test(value)
+  if (!hasTime) {
+    if (endOfDay) {
+      parsed.setHours(23, 59, 59, 999)
+    } else {
+      parsed.setHours(0, 0, 0, 0)
+    }
   }
   return parsed.toISOString()
 }

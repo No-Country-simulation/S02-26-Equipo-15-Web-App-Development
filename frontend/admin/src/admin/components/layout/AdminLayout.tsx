@@ -51,7 +51,7 @@ export function AdminLayout() {
 
       <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-[1500px] px-4 pb-6 pt-4 sm:px-6 lg:p-8">
-          <div className="relative min-h-[calc(100vh-2rem)] overflow-hidden rounded-[28px] border border-border/80 bg-[linear-gradient(180deg,rgba(17,31,74,0.92)_0%,rgba(10,20,56,0.92)_100%)] p-4 shadow-panel backdrop-blur sm:p-6 lg:p-8">
+          <div className="relative min-h-[calc(100vh-2rem)] rounded-[28px] border border-border/80 bg-[linear-gradient(180deg,rgba(17,31,74,0.92)_0%,rgba(10,20,56,0.92)_100%)] p-4 shadow-panel backdrop-blur sm:p-6 lg:p-8">
             <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#2D8CFF]/12 blur-3xl" />
             <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-1/3 h-56 w-56 rounded-full bg-[#FF1FB3]/10 blur-3xl" />
 
