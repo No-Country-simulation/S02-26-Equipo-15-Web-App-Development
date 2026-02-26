@@ -31,57 +31,62 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#070F2B] bg-grid [background-size:24px_24px] p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="mb-4">
-            <TrackSureBrand />
-          </div>
-          <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent">
-            <LockKeyhole className="h-5 w-5" />
-          </div>
-          <CardTitle>TrackSure Dashboard</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-2">
-              <label htmlFor="username" className="text-sm text-muted">
-                Usuario
-              </label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="admin"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                autoComplete="username"
-                required
-              />
-            </div>
+    <main className="min-h-screen bg-[#070F2B] bg-grid [background-size:24px_24px] p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-[980px] flex-col gap-6">
+        <div className="flex justify-end">
+          <TrackSureBrand />
+        </div>
 
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm text-muted">
-                Password
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Ingresa password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
+        <div className="flex flex-1 items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent">
+                <LockKeyhole className="h-5 w-5" />
+              </div>
+              <CardTitle>TrackSure Intelligence Dashboard</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={onSubmit}>
+                <div className="space-y-2">
+                  <label htmlFor="username" className="text-sm text-muted">
+                    Usuario
+                  </label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="admin"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    autoComplete="username"
+                    required
+                  />
+                </div>
 
-            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+                <div className="space-y-2">
+                  <label htmlFor="password" className="text-sm text-muted">
+                    Password
+                  </label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Ingresa password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
 
-            <Button type="submit" className="w-full" disabled={isLoggingIn}>
-              {isLoggingIn ? 'Validando...' : 'Ingresar'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+                {error ? <p className="text-sm text-red-300">{error}</p> : null}
+
+                <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                  {isLoggingIn ? 'Validando...' : 'Ingresar'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </main>
   )
 }
