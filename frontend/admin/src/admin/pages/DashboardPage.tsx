@@ -106,9 +106,11 @@ export function DashboardPage() {
       />
 
       <StickyFiltersPanel className="mb-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div>
           <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-          <Button variant="secondary" onClick={handleClearFilters}>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <Button variant="secondary" onClick={handleClearFilters} className="w-full lg:w-auto lg:min-w-[220px]">
             Limpiar filtros
           </Button>
         </div>
