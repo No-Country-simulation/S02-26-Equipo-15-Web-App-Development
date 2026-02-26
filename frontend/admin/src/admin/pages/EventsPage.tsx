@@ -4,6 +4,7 @@ import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from '@tan
 import { DateRangeFilter } from '@/admin/components/common/DateRangeFilter'
 import { EmptyState } from '@/admin/components/common/EmptyState'
 import { ErrorAlert } from '@/admin/components/common/ErrorAlert'
+import { StickyFiltersPanel } from '@/admin/components/common/StickyFiltersPanel'
 import { TableSkeleton } from '@/admin/components/common/Skeletons'
 import { PageHeader } from '@/admin/components/layout/PageHeader'
 import { Button } from '@/admin/components/ui/button'
@@ -121,24 +122,26 @@ export function EventsPage() {
         }
       />
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
-        <Input
-          placeholder="Buscar eventId..."
-          value={searchInput}
-          onChange={handleSearchChange}
-        />
-        <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-        <Select value={eventType} onChange={handleEventTypeChange}>
-          <option value="">Todos los tipos</option>
-          <option value="landing_view">landing_view</option>
-          <option value="click_cta">click_cta</option>
-          <option value="begin_checkout">begin_checkout</option>
-          <option value="purchase">purchase</option>
-        </Select>
-        <Button variant="secondary" onClick={handleClearFilters}>
-          Limpiar filtros
-        </Button>
-      </div>
+      <StickyFiltersPanel>
+        <div className="grid gap-3 lg:grid-cols-4">
+          <Input
+            placeholder="Buscar eventId..."
+            value={searchInput}
+            onChange={handleSearchChange}
+          />
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+          <Select value={eventType} onChange={handleEventTypeChange}>
+            <option value="">Todos los tipos</option>
+            <option value="landing_view">landing_view</option>
+            <option value="click_cta">click_cta</option>
+            <option value="begin_checkout">begin_checkout</option>
+            <option value="purchase">purchase</option>
+          </Select>
+          <Button variant="secondary" onClick={handleClearFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+      </StickyFiltersPanel>
 
       {eventsQuery.isPending ? <TableSkeleton /> : null}
       {error ? <ErrorAlert error={error} /> : null}
