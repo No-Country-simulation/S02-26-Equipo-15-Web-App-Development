@@ -169,13 +169,12 @@ export function SessionsPage() {
       />
 
       <StickyFiltersPanel>
-        <div className="grid gap-3 lg:grid-cols-4">
+        <div className="grid gap-3 lg:grid-cols-2">
           <Input
             placeholder="Buscar por eventId..."
             value={searchInput}
             onChange={handleSearchChange}
           />
-          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
           <Select value={businessStatus} onChange={handleBusinessStatusChange}>
             <option value="ALL">Todos los estados</option>
             <option value="SUCCESS">SUCCESS</option>
@@ -183,7 +182,14 @@ export function SessionsPage() {
             <option value="PENDING">PENDING</option>
             <option value="UNKNOWN">UNKNOWN</option>
           </Select>
-          <Button variant="secondary" onClick={handleClearFilters}>
+        </div>
+
+        <div className="mt-3">
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+        </div>
+
+        <div className="mt-3 flex justify-end">
+          <Button variant="secondary" onClick={handleClearFilters} className="w-full lg:w-auto lg:min-w-[220px]">
             Limpiar filtros
           </Button>
         </div>

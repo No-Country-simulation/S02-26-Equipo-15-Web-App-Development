@@ -135,13 +135,12 @@ export function EventsPage() {
       />
 
       <StickyFiltersPanel>
-        <div className="grid gap-3 lg:grid-cols-4">
+        <div className="grid gap-3 lg:grid-cols-2">
           <Input
             placeholder="Buscar eventId..."
             value={searchInput}
             onChange={handleSearchChange}
           />
-          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
           <Select value={eventType} onChange={handleEventTypeChange}>
             <option value="">Todos los tipos</option>
             <option value="landing_view">landing_view</option>
@@ -149,7 +148,14 @@ export function EventsPage() {
             <option value="begin_checkout">begin_checkout</option>
             <option value="purchase">purchase</option>
           </Select>
-          <Button variant="secondary" onClick={handleClearFilters}>
+        </div>
+
+        <div className="mt-3">
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+        </div>
+
+        <div className="mt-3 flex justify-end">
+          <Button variant="secondary" onClick={handleClearFilters} className="w-full lg:w-auto lg:min-w-[220px]">
             Limpiar filtros
           </Button>
         </div>
