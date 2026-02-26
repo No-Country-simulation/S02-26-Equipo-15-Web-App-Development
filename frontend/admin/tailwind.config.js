@@ -4,23 +4,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: '#050816',
-        surface: '#0b1020',
-        card: '#10192d',
-        muted: '#8b97b5',
-        border: '#23324f',
-        accent: '#22d3ee',
+        background: '#070F2B',
+        surface: '#0A1438',
+        card: '#111F4A',
+        muted: '#7CB6FF',
+        border: '#254E97',
+        accent: '#2D8CFF',
         success: '#10b981',
         danger: '#ef4444',
         warning: '#f59e0b',
         info: '#3b82f6',
       },
       boxShadow: {
-        panel: '0 10px 40px -20px rgba(2, 8, 23, 0.8)',
+        panel: '0 10px 40px -20px rgba(45, 140, 255, 0.35)',
       },
       backgroundImage: {
         grid:
-          'radial-gradient(circle at 1px 1px, rgba(139,151,181,0.15) 1px, transparent 0)',
+          'radial-gradient(circle at 1px 1px, rgba(124,182,255,0.16) 1px, transparent 0)',
       },
     },
   },
