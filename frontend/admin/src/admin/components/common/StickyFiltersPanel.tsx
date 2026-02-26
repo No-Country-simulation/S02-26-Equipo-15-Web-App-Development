@@ -20,7 +20,7 @@ export function StickyFiltersPanel({
   return (
     <section
       className={cn(
-        'sticky top-3 z-20 rounded-2xl border border-border bg-surface/95 shadow-lg shadow-black/20 backdrop-blur lg:top-4',
+        'sticky top-3 z-20 rounded-2xl border border-border/90 bg-[linear-gradient(180deg,rgba(17,31,74,0.92)_0%,rgba(10,20,56,0.92)_100%)] shadow-[0_12px_28px_-20px_rgba(45,140,255,0.6)] backdrop-blur lg:top-4',
         className,
       )}
     >
