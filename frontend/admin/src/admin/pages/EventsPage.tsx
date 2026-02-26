@@ -39,12 +39,21 @@ const columns: ColumnDef<EventsTableRow>[] = [
   },
 ]
 
-function toIso(value: string) {
+function toIso(value: string, endOfDay = false) {
   if (!value) {
     return undefined
   }
   const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined
+  }
+
+  if (endOfDay) {
+    parsed.setHours(23, 59, 59, 999)
+  } else {
+    parsed.setHours(0, 0, 0, 0)
+  }
+  return parsed.toISOString()
 }
 
 export function EventsPage() {
@@ -61,7 +70,7 @@ export function EventsPage() {
 
   const { eventsQuery, rows, isLoadingDetails } = useEventsTableData({
     from: toIso(debouncedFrom),
-    to: toIso(debouncedTo),
+    to: toIso(debouncedTo, true),
     eventType: eventType || undefined,
     limit: PAGE_SIZE,
     offset,

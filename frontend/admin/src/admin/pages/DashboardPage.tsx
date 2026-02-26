@@ -51,12 +51,21 @@ const TOOLTIP_STYLE = {
 const TOOLTIP_LABEL_STYLE = { color: '#f8fafc', fontWeight: 700 }
 const TOOLTIP_ITEM_STYLE = { color: '#e2e8f0' }
 
-function toIso(value: string) {
+function toIso(value: string, endOfDay = false) {
   if (!value) {
     return undefined
   }
   const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined
+  }
+
+  if (endOfDay) {
+    parsed.setHours(23, 59, 59, 999)
+  } else {
+    parsed.setHours(0, 0, 0, 0)
+  }
+  return parsed.toISOString()
 }
 
 export function DashboardPage() {
@@ -67,7 +76,7 @@ export function DashboardPage() {
 
   const query = useDashboardStats({
     from: toIso(debouncedFrom),
-    to: toIso(debouncedTo),
+    to: toIso(debouncedTo, true),
   })
 
   const chartData = query.data?.ordersByStatus ?? []
