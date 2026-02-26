@@ -6,6 +6,7 @@ import { DateRangeFilter } from '@/admin/components/common/DateRangeFilter'
 import { EmptyState } from '@/admin/components/common/EmptyState'
 import { ErrorAlert } from '@/admin/components/common/ErrorAlert'
 import { StatusChip } from '@/admin/components/common/StatusChip'
+import { StickyFiltersPanel } from '@/admin/components/common/StickyFiltersPanel'
 import { TableSkeleton } from '@/admin/components/common/Skeletons'
 import { PageHeader } from '@/admin/components/layout/PageHeader'
 import { Button } from '@/admin/components/ui/button'
@@ -155,24 +156,26 @@ export function SessionsPage() {
         }
       />
 
-      <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 lg:grid-cols-4">
-        <Input
-          placeholder="Buscar por eventId..."
-          value={searchInput}
-          onChange={handleSearchChange}
-        />
-        <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
-        <Select value={businessStatus} onChange={handleBusinessStatusChange}>
-          <option value="ALL">Todos los estados</option>
-          <option value="SUCCESS">SUCCESS</option>
-          <option value="FAILED">FAILED</option>
-          <option value="PENDING">PENDING</option>
-          <option value="UNKNOWN">UNKNOWN</option>
-        </Select>
-        <Button variant="secondary" onClick={handleClearFilters}>
-          Limpiar filtros
-        </Button>
-      </div>
+      <StickyFiltersPanel>
+        <div className="grid gap-3 lg:grid-cols-4">
+          <Input
+            placeholder="Buscar por eventId..."
+            value={searchInput}
+            onChange={handleSearchChange}
+          />
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+          <Select value={businessStatus} onChange={handleBusinessStatusChange}>
+            <option value="ALL">Todos los estados</option>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="FAILED">FAILED</option>
+            <option value="PENDING">PENDING</option>
+            <option value="UNKNOWN">UNKNOWN</option>
+          </Select>
+          <Button variant="secondary" onClick={handleClearFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+      </StickyFiltersPanel>
 
       {sessionsQuery.isPending ? <TableSkeleton /> : null}
       {error ? <ErrorAlert error={error} /> : null}
