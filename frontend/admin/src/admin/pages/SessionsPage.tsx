@@ -181,41 +181,84 @@ export function SessionsPage() {
       {error ? <ErrorAlert error={error} /> : null}
 
       {!sessionsQuery.isPending && !error ? (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <>
           {filteredRows.length === 0 ? (
-            <div className="p-6">
+            <div className="rounded-2xl border border-border bg-card p-6">
               <EmptyState
                 title="No se encontraron sesiones"
                 description="Ajusta los filtros o prueba con un rango de fechas mas amplio."
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-surface">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    ))}
-                  </TableRow>
+            <>
+              <div className="space-y-3 md:hidden">
+                {filteredRows.map((row) => (
+                  <article key={row.eventId} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-muted">eventId</p>
+                      <p className="break-all font-mono text-xs text-slate-200">{row.eventId}</p>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">Fecha</p>
+                        <p className="text-sm text-slate-100">{formatDateTime(row.createdAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">Monto</p>
+                        <p className="text-sm text-slate-100">{formatCurrency(row.amount, row.currency ?? 'USD')}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">Business</p>
+                        <StatusChip status={row.businessStatus} />
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">GA4 / Meta</p>
+                        <div className="flex items-center gap-2">
+                          <StatusChip status={row.ga4Status} />
+                          <StatusChip status={row.metaStatus} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <Button asChild size="sm" variant="outline" className="w-full">
+                        <Link to={`/admin/sessions/${row.eventId}`}>Ver trazabilidad</Link>
+                      </Button>
+                    </div>
+                  </article>
                 ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+              </div>
+
+              <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-surface">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
-        </div>
+        </>
       ) : null}
 
       {isLoadingDetails ? <p className="text-xs text-muted">Resolviendo business_status para sesiones visibles...</p> : null}

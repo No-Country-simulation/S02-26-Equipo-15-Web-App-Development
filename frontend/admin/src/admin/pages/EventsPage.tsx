@@ -147,41 +147,70 @@ export function EventsPage() {
       {error ? <ErrorAlert error={error} /> : null}
 
       {!eventsQuery.isPending && !error ? (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <>
           {filteredRows.length === 0 ? (
-            <div className="p-6">
+            <div className="rounded-2xl border border-border bg-card p-6">
               <EmptyState
                 title="No hay eventos para mostrar"
                 description="Ajusta los filtros de fecha o tipo de evento."
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-surface">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </TableHead>
-                    ))}
-                  </TableRow>
+            <>
+              <div className="space-y-3 md:hidden">
+                {filteredRows.map((row) => (
+                  <article key={row.id} className="rounded-2xl border border-border bg-card p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-100">{row.eventType}</p>
+                      <p className="text-xs text-muted">{formatDateTime(row.createdAt)}</p>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-muted">eventId</p>
+                      <p className="break-all font-mono text-xs text-slate-200">{row.eventId}</p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">landing_path</p>
+                        <p className="break-all text-xs text-slate-100">{row.landingPath ?? '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted">orderId</p>
+                        <p className="break-all font-mono text-xs text-slate-100">{row.orderId ?? '-'}</p>
+                      </div>
+                    </div>
+                  </article>
                 ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+              </div>
+
+              <div className="hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-surface">
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id}>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
-        </div>
+        </>
       ) : null}
 
       {isLoadingDetails ? (
