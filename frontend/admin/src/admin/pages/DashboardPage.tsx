@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -21,9 +21,11 @@ import { ChartCard } from '@/admin/components/dashboard/ChartCard'
 import { EmptyState } from '@/admin/components/common/EmptyState'
 import { ErrorAlert } from '@/admin/components/common/ErrorAlert'
 import { KpiSkeletonGrid } from '@/admin/components/common/Skeletons'
+import { StickyFiltersPanel } from '@/admin/components/common/StickyFiltersPanel'
 import { StatusChip } from '@/admin/components/common/StatusChip'
 import { DateRangeFilter } from '@/admin/components/common/DateRangeFilter'
 import { PageHeader } from '@/admin/components/layout/PageHeader'
+import { Button } from '@/admin/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/admin/components/ui/card'
 import { useDebouncedValue } from '@/admin/hooks/useDebouncedValue'
 import { useDashboardStats } from '@/admin/hooks/useDashboardStats'
@@ -79,14 +81,26 @@ export function DashboardPage() {
   ]
 
   const error = useMemo(() => (query.error ? normalizeHttpError(query.error) : null), [query.error])
+  const handleClearFilters = useCallback(() => {
+    setFrom('')
+    setTo('')
+  }, [])
 
   return (
     <section>
       <PageHeader
         title="Admin Dashboard"
         description="Monitoreo operativo de funnel, ordenes y correlacion por eventId"
-        actions={<DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />}
       />
+
+      <StickyFiltersPanel className="mb-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <DateRangeFilter from={from} to={to} onFromChange={setFrom} onToChange={setTo} />
+          <Button variant="secondary" onClick={handleClearFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+      </StickyFiltersPanel>
 
       {query.isPending ? <KpiSkeletonGrid /> : null}
       {error ? <ErrorAlert error={error} /> : null}
