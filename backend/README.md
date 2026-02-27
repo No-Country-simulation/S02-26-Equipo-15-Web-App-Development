@@ -1,117 +1,97 @@
-# TrackSure API (Backend)
+# TrackSure API
 
-API de tracking, pagos y atribucion server-side construida con Spring Boot 3, Java 17, PostgreSQL y Flyway.
+Backend de tracking y conversion server-side de TrackSure.
+Implementa correlacion por `eventId`, procesamiento idempotente de webhooks Stripe y exposicion de datos para TrackSure Dashboard.
 
 ## Arquitectura en capas
 
-El backend sigue una separacion por responsabilidades:
-
-- `controller`: expone endpoints REST (`/api/track`, `/api/stripe/webhook`, `/api/admin/*`).
-- `service`: reglas de negocio (tracking, webhook Stripe, correlacion y metricas).
-- `repository`: acceso a datos para `tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`, `integrations_log`.
-- `integration`: conectores de salida para GA4 MP y Meta CAPI.
-- `config`: seguridad, propiedades y wiring transversal.
+- `controller`: contratos HTTP (`/api/track`, `/api/stripe/webhook`, `/api/admin/*`).
+- `service`: reglas de negocio (tracking, orders, idempotencia, integraciones).
+- `repository`: acceso a PostgreSQL.
+- `integration`: conectores hacia GA4 MP y Meta CAPI.
+- `config`: seguridad, CORS y propiedades de aplicacion.
 
 ## Endpoints
 
 | Metodo | Endpoint | Uso | Seguridad |
 |---|---|---|---|
-| `GET` | `/` | Ping simple de servicio | Publico |
-| `POST` | `/api/track` | Registra eventos de funnel y mantiene sesion por `eventId` | Publico + rate limit |
-| `POST` | `/api/stripe/webhook` | Procesa webhook Stripe y actualiza ordenes/integraciones | Publico + firma Stripe |
-| `GET` | `/api/admin/health` | Verifica credenciales admin | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/sessions` | Lista sesiones (filtros/paginacion) | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/sessions/{eventId}` | Devuelve trazabilidad completa de la sesion | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/events` | Lista eventos (tipo/rango/paginacion) | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/metrics` | KPIs de dashboard | Basic Auth (`ADMIN`) |
-| `GET` | `/api/health/db` | Health de DB (`SELECT 1`) | Publico |
+| `GET` | `/` | Estado basico del servicio | Publico |
+| `POST` | `/api/track` | Registra eventos del funnel y maneja sesion por `eventId` | Publico + rate limit |
+| `POST` | `/api/stripe/webhook` | Procesa webhooks Stripe y actualiza `orders` | Publico + firma Stripe |
+| `GET` | `/api/admin/health` | Health de autenticacion admin | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/sessions` | Lista sesiones | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/sessions/{eventId}` | Detalle por sesion | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/events` | Lista eventos | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/metrics` | KPIs de negocio | Basic Auth (`ADMIN`) |
+| `GET` | `/api/health/db` | Health de DB | Publico |
 | `GET` | `/actuator/health` | Health de plataforma | Publico |
 
-Swagger no esta habilitado en el deploy actual.
-
-## Webhook Stripe
-
-Pipeline principal en `StripeWebhookService`:
-
-1. Extrae `stripe_event_id` y crea/recupera registro en `stripe_webhook_event`.
-2. Valida firma con `Stripe-Signature` y `STRIPE_WEBHOOK_SECRET`.
-3. Aplica idempotencia por PK (`stripe_webhook_event.stripe_event_id`).
-4. Correlaciona `eventId` desde metadata/client reference.
-5. Upsert de `orders` por `stripe_session_id` y/o `payment_intent_id`.
-6. Actualiza `business_status` y dispara integraciones server-side cuando corresponde.
-
-### Mapeo a `business_status`
-
-| Estado Stripe (ejemplos) | Estado de negocio |
-|---|---|
-| `SUCCEEDED`, `PAID` | `SUCCESS` |
-| `PROCESSING`, `REQUIRES_ACTION`, `PENDING`, `OPEN`, `UNPAID` | `PENDING` |
-| `FAILED`, `CANCELED`, `REQUIRES_PAYMENT_METHOD` | `FAILED` |
-| Cualquier otro | `UNKNOWN` |
+Swagger no esta habilitado actualmente.
+Opcionalmente puede agregarse con `springdoc-openapi`.
 
 ## Seguridad
 
-- Admin protegido por HTTP Basic y rol `ADMIN` (`/api/admin/**`).
-- Credenciales por entorno: `ADMIN_USER` y `ADMIN_PASS`.
-- Si `ADMIN_PASS` falta en `prod`, no se cae la app pero el acceso admin queda bloqueado.
+- `/api/admin/**` requiere HTTP Basic con rol `ADMIN`.
+- Credenciales por entorno:
+  - `ADMIN_USER`
+  - `ADMIN_PASS`
+- En perfiles no locales sin `ADMIN_PASS`, el acceso admin queda bloqueado.
+
+## Webhook Stripe
+
+`StripeWebhookService` implementa:
+
+1. Validacion de firma (`Stripe-Signature` + `STRIPE_WEBHOOK_SECRET`).
+2. Idempotencia por `stripe_webhook_event.stripe_event_id`.
+3. Upsert de ordenes por `stripe_session_id` / `payment_intent_id`.
+4. Correlacion por `eventId` cuando esta disponible.
+5. Actualizacion de `orders.business_status`.
+6. Dispatch de integraciones server-side y log en `integrations_log`.
 
 ## Base de datos y Flyway
 
-- Motor objetivo: PostgreSQL (Render en produccion).
-- Migraciones en: `src/main/resources/db/migration`.
-- Versiones actuales: `V1` a `V9`.
-- Tablas core:
-  - `tracking_session`
-  - `tracking_event`
-  - `orders`
-  - `stripe_webhook_event`
-  - `integrations_log`
+- PostgreSQL como storage principal.
+- Flyway como fuente de verdad (`src/main/resources/db/migration`).
+- Migraciones actuales: `V1` a `V9`.
 
-Estrategia:
+Tablas principales:
 
-- No se usa `ddl-auto` para evolucionar esquema en produccion.
-- Todo cambio estructural va por migracion versionada.
-- Las constraints unicas y PK sostienen idempotencia operativa.
+- `tracking_session`
+- `tracking_event`
+- `orders`
+- `stripe_webhook_event`
+- `integrations_log`
 
-## Variables de entorno (Render-ready)
+## Variables de entorno
 
-### Minimas para produccion
+### Minimas para produccion (Render)
 
-- `SPRING_DATASOURCE_URL` (JDBC)
+- `PORT`
+- `SPRING_DATASOURCE_URL`
 - `SPRING_DATASOURCE_USERNAME`
 - `SPRING_DATASOURCE_PASSWORD`
 - `ADMIN_USER`
 - `ADMIN_PASS`
 - `STRIPE_WEBHOOK_SECRET`
 
-### Variables funcionales
+### Opcionales
 
 - `TRACKING_ENABLED`
-- `GA4_MP_ENABLED`
-- `GA4_MEASUREMENT_ID`
-- `GA4_API_SECRET`
-- `GA4_MP_DEBUG_VALIDATION_ENABLED`
-- `META_CAPI_ENABLED`
-- `META_PIXEL_ID`
-- `META_ACCESS_TOKEN`
+- `GA4_MP_ENABLED`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`, `GA4_MP_DEBUG_VALIDATION_ENABLED`
+- `META_CAPI_ENABLED`, `META_PIXEL_ID`, `META_ACCESS_TOKEN`
+- `PIPEDRIVE_ENABLED`, `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
-### Fallback de conexion DB
+Fallback de datasource:
 
-Si no se define `SPRING_DATASOURCE_URL`, la app puede resolver con:
+- `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
 
-- `PGHOST`
-- `PGPORT`
-- `PGDATABASE`
-- `PGUSER`
-- `PGPASSWORD`
-
-Ejemplo Render:
+Ejemplo Render valido:
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://<host-render>:5432/<db>?sslmode=require
-SPRING_DATASOURCE_USERNAME=<user>
-SPRING_DATASOURCE_PASSWORD=<password>
+SPRING_DATASOURCE_URL=jdbc:postgresql://dpg-xxxx.a.oregon-postgres.render.com:5432/nocountry_rvoc?sslmode=require
+SPRING_DATASOURCE_USERNAME=nocountry_rvoc_user
+SPRING_DATASOURCE_PASSWORD=***
 ```
 
 ## Ejecucion local
@@ -123,23 +103,35 @@ mvn spring-boot:run
 
 ## Testing
 
-Ejecutar:
-
 ```bash
 cd backend
 mvn test
 ```
 
-Cobertura actual relevante:
+### Que miden los tests
 
-- `SecurityConfigTest`: valida proteccion de `/api/admin/**` y apertura de `/api/track` y `/api/stripe/webhook`.
-- `StripeWebhookIdempotencyTest`: evita reprocesar el mismo `stripeEventId`.
-- `OrderStatusTransitionTest`: valida transiciones de `business_status` segun eventos Stripe.
-- `TrackControllerTest`: valida contrato basico de `/api/track`.
-- `TrackingServiceTest`: valida persistencia e idempotencia de tracking.
+- `SecurityConfigTest`
+  - Verifica que `/api/admin/**` este protegido y que `/api/track` y `/api/stripe/webhook` sigan publicos.
+  - Valor: evita regresiones de seguridad en despliegues.
+
+- `StripeWebhookIdempotencyTest`
+  - Verifica no reprocesar dos veces el mismo evento Stripe.
+  - Valor: evita ordenes y conversiones duplicadas.
+
+- `OrderStatusTransitionTest`
+  - Verifica transiciones de `business_status`.
+  - Valor: preserva consistencia de metricas de negocio.
+
+- `TrackControllerTest`
+  - Verifica contrato de entrada/salida de `/api/track`.
+  - Valor: protege integracion con landing.
+
+- `TrackingServiceTest`
+  - Verifica persistencia e idempotencia del tracking.
+  - Valor: mantiene trazabilidad estable por `eventId`.
 
 ## Deploy
 
-- Servicio backend desplegado en Render.
-- URL base de referencia: `https://s02-26-equipo-15-web-app-development.onrender.com`
-- Webhook Stripe esperado: `https://s02-26-equipo-15-web-app-development.onrender.com/api/stripe/webhook`
+- Plataforma: Render
+- API base: `https://s02-26-equipo-15-web-app-development.onrender.com`
+- Webhook Stripe: `https://s02-26-equipo-15-web-app-development.onrender.com/api/stripe/webhook`

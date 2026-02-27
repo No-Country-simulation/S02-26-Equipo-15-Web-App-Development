@@ -27,7 +27,7 @@ La clave de correlacion principal es `event_id` (UUID).
 - Define reglas de idempotencia y consistencia para auditoria.
 
 Fuente de verdad del esquema:
-- Migraciones Flyway `backend/src/main/resources/db/migration/V1..V7`.
+- Migraciones Flyway `backend/src/main/resources/db/migration/V1..V9`.
 - Script de apoyo: `BDD/pgcrypto.sql` (bootstrap del estado final).
 
 ## 3) Tablas principales
@@ -178,3 +178,4 @@ La traza por `event_id` deberia permitir confirmar, en orden temporal:
 3. Se consolido una orden sin duplicados (`orders`).
 4. Se recibieron/procesaron webhooks (`stripe_webhook_event`).
 5. Se registraron envios de integraciones (`integrations_log`).
+
