@@ -6,10 +6,18 @@
 
 ## A) Resumen
 
-TrackSure es una plataforma de atribucion de revenue y tracking server-side para ecommerce.
-Conecta navegacion en landing, pagos en Stripe, persistencia en PostgreSQL y observabilidad operativa en un dashboard.
-Su objetivo es convertir datos dispersos en trazabilidad accionable para growth, marketing y operaciones.
-Cada conversion puede auditarse de punta a punta con una clave comun: `eventId`.
+TrackSure es una plataforma de atribucion de ingresos orientada a decisiones reales de negocio.
+Conecta navegacion en landing, conversion en Stripe y evidencia operativa en un mismo hilo de datos.
+El resultado es trazabilidad end-to-end para saber que campanas generan revenue y donde se pierde conversion.
+Cada sesion, evento y pago puede auditarse de punta a punta con una clave comun: `eventId`.
+
+## 🎯 ¿Qué hace diferente a TrackSure?
+
+- Atribucion basada en ingresos reales (Stripe), no solo clicks.
+- Correlacion end-to-end con `eventId`.
+- Webhook idempotente para evitar ordenes duplicadas.
+- Auditoria de integraciones con evidencia de envios, latencia y estado.
+- Modelo de datos preparado para analisis de funnel y operacion diaria.
 
 ## B) Problema que resuelve
 
@@ -53,7 +61,7 @@ flowchart LR
 
 - `backend/`: TrackSure API (Spring Boot 3 + Java 17).
 - `frontend/landing/`: sitio de entrada y captura inicial de tracking.
-- `frontend/admin/`: TrackSure Intelligence Dashboard (operacion y auditoria).
+- `frontend/admin/`: TrackSure Dashboard (operacion y auditoria).
 - `infra/`: arquitectura, modelo de datos y guias tecnicas.
 
 ### Decision sobre `/BDD`
@@ -158,8 +166,6 @@ Opcionalmente, puede habilitarse agregando `springdoc-openapi` al backend y expo
 - `META_CAPI_ENABLED`
 - `META_PIXEL_ID`
 - `META_ACCESS_TOKEN`
-- `PIPEDRIVE_ENABLED`
-- `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
 ### Fallback de datasource (si no se define `SPRING_DATASOURCE_URL`)
@@ -211,7 +217,7 @@ VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 ```
 
-### 3. TrackSure Intelligence Dashboard
+### 3. TrackSure Dashboard
 
 ```bash
 cd frontend/admin
@@ -238,23 +244,52 @@ VITE_API_URL=http://localhost:8080
 - Stripe debe enviar webhook a:
   - `https://<tu-servicio-render>/api/stripe/webhook`
 
-### Vercel (Landing + TrackSure Intelligence Dashboard)
+### Vercel (Landing + TrackSure Dashboard)
 
 - `frontend/landing` y `frontend/admin` en proyectos separados.
 - En ambos, `VITE_API_URL` debe apuntar al backend en Render.
 
-## K) Observabilidad y auditoria
+## 🔍 Observabilidad y Auditoría
 
-La trazabilidad operativa se apoya en dos tablas:
+TrackSure registra evidencia operativa en tablas dedicadas para poder auditar cada conversion:
 
-- `stripe_webhook_event`: estado de recepcion/procesamiento por `stripe_event_id`.
-- `integrations_log`: evidencia de envios a GA4 MP / Meta CAPI (status, http_status, payloads).
+- `tracking_session` y `tracking_event`: contexto de navegacion y eventos del funnel.
+- `orders`: consolidacion de pago y estado de negocio (`business_status`).
+- `stripe_webhook_event`: recepcion, deduplicacion y resultado de procesamiento de webhooks.
+- `integrations_log`: registro de envios a GA4 MP y Meta CAPI con `status`, `httpStatus` y `latencyMs`.
 
-Esto permite responder rapidamente:
+Con esto el equipo puede:
 
-- si un webhook fue recibido o deduplicado,
-- si una orden quedo en `SUCCESS/PENDING/FAILED/UNKNOWN`,
-- si las integraciones externas enviaron correctamente.
+- demostrar si una conversion fue efectivamente procesada,
+- detectar fallas de integracion o demoras de entrega,
+- depurar discrepancias entre marketing, pagos y revenue,
+- seguir todo el flujo con `eventId` como hilo conductor tecnico y funcional.
+
+En TrackSure Dashboard, esta informacion se consulta por sesion y permite revisar estado de orden, webhooks e integraciones desde una sola vista.
+
+## 🧪 Estrategia de Testing
+
+Actualmente existe cobertura focalizada en seguridad, idempotencia y consistencia de estados:
+
+- `SecurityConfigTest`: valida proteccion de `/api/admin/**` y acceso publico en endpoints criticos.
+- `StripeWebhookIdempotencyTest`: evita reprocesar el mismo evento de Stripe.
+- `OrderStatusTransitionTest`: valida transiciones correctas de `business_status`.
+- `TrackControllerTest` y `TrackingServiceTest`: protegen contrato y persistencia del tracking por `eventId`.
+
+Esto es clave para evitar dos riesgos de negocio: revenue duplicado por reprocesos y perdida de trazabilidad en conversiones.
+
+Ejecucion:
+
+```bash
+cd backend
+mvn test
+```
+
+Plan de tests para ampliar cobertura:
+
+- pruebas end-to-end del flujo `track -> webhook -> integraciones`,
+- pruebas de carga para picos de webhooks,
+- pruebas de resiliencia ante errores transitorios en integraciones externas.
 
 ## L) Roadmap / pendientes
 

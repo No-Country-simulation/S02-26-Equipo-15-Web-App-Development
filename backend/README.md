@@ -79,7 +79,6 @@ Tablas principales:
 - `TRACKING_ENABLED`
 - `GA4_MP_ENABLED`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`, `GA4_MP_DEBUG_VALIDATION_ENABLED`
 - `META_CAPI_ENABLED`, `META_PIXEL_ID`, `META_ACCESS_TOKEN`
-- `PIPEDRIVE_ENABLED`, `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
 Fallback de datasource:
@@ -101,34 +100,42 @@ cd backend
 mvn spring-boot:run
 ```
 
-## Testing
+## 🧪 Testing (que valida y por que importa)
+
+Ejecucion:
 
 ```bash
 cd backend
 mvn test
 ```
 
-### Que miden los tests
+Cobertura actual (tests existentes en `src/test`):
 
 - `SecurityConfigTest`
-  - Verifica que `/api/admin/**` este protegido y que `/api/track` y `/api/stripe/webhook` sigan publicos.
-  - Valor: evita regresiones de seguridad en despliegues.
+  - Valida que `/api/admin/**` requiera autenticacion y que `/api/track` y `/api/stripe/webhook` permanezcan publicos.
+  - Importa porque evita regresiones de seguridad en produccion.
 
 - `StripeWebhookIdempotencyTest`
-  - Verifica no reprocesar dos veces el mismo evento Stripe.
-  - Valor: evita ordenes y conversiones duplicadas.
+  - Verifica que un mismo `stripeEventId` no se procese dos veces.
+  - Importa porque previene ordenes y conversiones duplicadas.
 
 - `OrderStatusTransitionTest`
-  - Verifica transiciones de `business_status`.
-  - Valor: preserva consistencia de metricas de negocio.
+  - Verifica transiciones correctas de `orders.business_status` a partir de eventos Stripe.
+  - Importa porque protege la consistencia del dashboard y de las metricas de negocio.
 
 - `TrackControllerTest`
-  - Verifica contrato de entrada/salida de `/api/track`.
-  - Valor: protege integracion con landing.
+  - Verifica contrato HTTP de `POST /api/track`.
+  - Importa porque protege la integracion entre landing y TrackSure API.
 
 - `TrackingServiceTest`
-  - Verifica persistencia e idempotencia del tracking.
-  - Valor: mantiene trazabilidad estable por `eventId`.
+  - Verifica persistencia e idempotencia de tracking por `eventId`.
+  - Importa porque asegura trazabilidad estable del funnel.
+
+Tests recomendados para ampliar cobertura:
+
+- pruebas end-to-end completas (`/api/track` -> `/api/stripe/webhook` -> `integrations_log`),
+- pruebas de concurrencia para webhooks simultaneos,
+- pruebas de resiliencia ante fallas temporales de integraciones externas.
 
 ## Deploy
 
