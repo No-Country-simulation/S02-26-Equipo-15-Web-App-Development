@@ -1,10 +1,37 @@
-# NoCountry Admin Panel
+# TrackSure Admin
 
-Panel de observabilidad para auditar el funnel por `eventId`, revisar conversiones y seguir el estado de integraciones.
+Panel operativo para monitorear trazabilidad de funnel, estado de ordenes y salud de integraciones por `eventId`.
 
-## Deploy
+## Que muestra el dashboard
 
-- https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login
+- KPIs de sesiones, eventos y ordenes.
+- Revenue acumulado y distribucion de `business_status`.
+- Estado de integraciones (`GA4_MP`, `META_CAPI`) desde `integrations_log`.
+- Trazabilidad completa por sesion (`eventId`).
+
+## Filtros disponibles
+
+### Sessions
+
+- Busqueda por `eventId`
+- Rango de fechas (`from`, `to`)
+- Filtro por `business_status`
+- Paginacion (`Anterior` / `Siguiente`)
+
+### Events
+
+- Busqueda por `eventId`
+- Rango de fechas (`from`, `to`)
+- Filtro por `eventType`
+- Paginacion
+
+## Como validar trazabilidad end-to-end
+
+1. Abrir `Sessions` y buscar un `eventId`.
+2. Entrar al detalle de sesion.
+3. Verificar secuencia de eventos (`landing_view -> click_cta -> begin_checkout -> purchase`).
+4. Confirmar orden en `orders` con `business_status`.
+5. Confirmar logs de integraciones con estado y HTTP status.
 
 ## Configuracion
 
@@ -20,22 +47,15 @@ Variable requerida:
 VITE_API_URL=http://localhost:8080
 ```
 
-- `VITE_API_URL`: URL base del backend (Render en cloud, localhost en desarrollo).
+Para nube:
 
-## Login y autenticacion
+- `VITE_API_URL` debe apuntar al backend de Render.
 
-- El login usa credenciales reales del backend (HTTP Basic).
-- Valida acceso contra `GET /api/admin/health`.
-- Si la validacion es correcta, usa el header `Authorization: Basic ...` en las llamadas a `/api/admin/**`.
-- Credenciales: mismas de backend (`ADMIN_USER`, `ADMIN_PASS`).
+## Autenticacion
 
-## Metricas que muestra
-
-- Sesiones (`tracking_session`) y detalle por `eventId`.
-- Eventos (`tracking_event`) por rango/tipo.
-- Ordenes y revenue (`orders`).
-- Distribucion de `orders.business_status` (`SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`).
-- Estado de integraciones desde `Integrations log`.
+- Login con credenciales del backend (`ADMIN_USER` / `ADMIN_PASS`).
+- Validacion inicial contra `GET /api/admin/health`.
+- Luego usa `Authorization: Basic ...` para `/api/admin/**`.
 
 ## Correr local
 
@@ -45,7 +65,7 @@ npm install
 npm run dev
 ```
 
-- URL local: `http://localhost:5173` (o puerto disponible de Vite).
+URL local: `http://localhost:5173` (o puerto libre de Vite).
 
 ## Build
 
@@ -54,3 +74,9 @@ cd frontend/admin
 npm run build
 npm run preview
 ```
+
+## Deploy
+
+- Plataforma: Vercel
+- URL actual: `https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login`
+- Variable clave en Vercel: `VITE_API_URL=https://s02-26-equipo-15-web-app-development.onrender.com`
