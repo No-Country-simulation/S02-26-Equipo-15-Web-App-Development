@@ -1,6 +1,7 @@
 # Modelo BDD
 
-Documento alineado con el esquema versionado en Flyway.
+Documento alineado al esquema actual en Flyway.
+La fuente de verdad del modelo de produccion es `backend/src/main/resources/db/migration`.
 
 ## 1) Modelo relacional (ERD)
 
@@ -64,13 +65,26 @@ erDiagram
     TRACKING_SESSION ||--o{ ORDERS : links
 ```
 
+## 2) Flujo de datos operativo
+
+```mermaid
+flowchart LR
+  TRACK[POST /api/track] --> TE[(tracking_event)]
+  TRACK --> TS[(tracking_session)]
+
+  STRIPE[POST /api/stripe/webhook] --> SWE[(stripe_webhook_event)]
+  STRIPE --> ORD[(orders)]
+
+  ORD --> INT[(integrations_log)]
+```
+
 Notas:
 
 - `stripe_webhook_event.event_id` es correlacion logica (no FK en DB).
 - `integrations_log.reference_id` es correlacion logica (normalmente `eventId` como texto).
 - En DB real, `orders.payment_intent_id` es unique parcial (`WHERE payment_intent_id IS NOT NULL`).
 
-## 2) Diccionario de tablas
+## 3) Diccionario de tablas
 
 ### `tracking_session`
 
@@ -146,7 +160,7 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 | `error_message` | `text` | Si | error resumido |
 | `created_at` | `timestamp` | No | fecha de log |
 
-## 3) Reglas de integridad e idempotencia
+## 4) Reglas de integridad e idempotencia
 
 - `tracking_event.id` evita duplicados por evento logico (`eventId|eventType`).
 - `stripe_webhook_event.stripe_event_id` evita reprocesar el mismo webhook.
@@ -154,7 +168,7 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `orders.payment_intent_id` (unique parcial) evita duplicar orden por payment intent.
 - `orders.business_status` normaliza `status` de Stripe para uso de negocio.
 
-## 4) Indices activos
+## 5) Indices activos
 
 - `idx_tracking_event_event_id`
 - `idx_tracking_event_created_at`
@@ -170,7 +184,7 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `idx_integrations_log_integration`
 - `idx_integrations_log_reference_id`
 
-## 5) Evolucion del esquema (Flyway)
+## 6) Evolucion del esquema (Flyway)
 
 - `V1__init.sql`: tablas base (`tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`) e indices iniciales.
 - `V2__integrations_log.sql`: crea `integrations_log`.
@@ -182,7 +196,7 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `V8__orders_fix_requires_payment_method_business_status.sql`: corrige normalizacion de estados failed.
 - `V9__orders_unpaid_business_status_pending.sql`: ajusta `unpaid` a estado de negocio `PENDING`.
 
-## 6) SQL de verificacion operativa
+## 7) SQL de verificacion operativa
 
 ```sql
 -- Webhooks recientes

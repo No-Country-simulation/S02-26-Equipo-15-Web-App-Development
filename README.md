@@ -4,120 +4,199 @@
 
 # TrackSure - Revenue Attribution & Server-Side Conversion Tracking
 
-TrackSure conecta navegacion, checkout y confirmacion de pago en un solo flujo auditable por `eventId`.  
-El producto combina tracking en landing, procesamiento Stripe webhook idempotente, persistencia en PostgreSQL y observabilidad operativa en un dashboard admin.
+## A) Resumen
 
-## Problema que resuelve
+TrackSure es una plataforma de atribucion de revenue y tracking server-side para ecommerce.
+Conecta navegacion en landing, pagos en Stripe, persistencia en PostgreSQL y observabilidad operativa en un dashboard.
+Su objetivo es convertir datos dispersos en trazabilidad accionable para growth, marketing y operaciones.
+Cada conversion puede auditarse de punta a punta con una clave comun: `eventId`.
 
-En ecommerce y campanas pagas, la atribucion se rompe por varios motivos:
+## B) Problema que resuelve
 
-- El tracking solo browser-side pierde eventos por cookies, ITP y adblockers.
-- Stripe redirige fuera del sitio y corta la trazabilidad del funnel.
-- Sin correlacion sesion-evento-pago no se puede saber que campana genero revenue real.
-- Los equipos de growth y operaciones no tienen auditoria tecnica de punta a punta.
+El tracking tradicional pierde confiabilidad justo en el punto mas critico: la conversion.
 
-## Como lo resuelve TrackSure
+- Los eventos browser-side pueden degradarse por ITP, bloqueadores y restricciones de cookies.
+- Stripe introduce una redireccion que suele romper la correlacion de datos.
+- Sin trazabilidad end-to-end, no se sabe que campana genero ingresos reales.
+- Operaciones carece de evidencia tecnica para explicar discrepancias entre funnels y revenue.
 
-- Genera y conserva un `eventId` para correlacionar todo el flujo.
-- Registra eventos de funnel (`landing_view`, `click_cta`, `begin_checkout`, `purchase`).
-- Procesa webhooks Stripe con validacion de firma e idempotencia.
+## C) Como lo resuelve
+
+TrackSure implementa un flujo orientado a consistencia operativa:
+
+- Usa `eventId` como correlacion entre sesion, eventos, webhook y orden.
+- Procesa `POST /api/stripe/webhook` con idempotencia por `stripe_event_id`.
+- Persiste datos en un modelo separado por responsabilidad (`tracking_session`, `tracking_event`, `orders`).
 - Normaliza el estado de negocio en `orders.business_status`.
-- Envia conversion server-side a GA4 MP y Meta CAPI.
-- Expone consultas admin para auditoria por sesion, evento, orden e integraciones.
+- Registra auditoria de integraciones en `integrations_log` para GA4 MP y Meta CAPI.
 
-## Arquitectura
+## D) Arquitectura
 
 ```mermaid
 flowchart LR
-  U[Usuario] --> L[Landing - React/Vite]
-  L -->|POST /api/track| API[TrackSure API - Spring Boot]
-  L -->|Stripe Checkout| ST[Stripe]
-  ST -->|Webhook firmado| API
+  U[Usuario] --> L[Landing React/Vite]
+  L -->|POST /api/track| API[TrackSure API]
+  L -->|Checkout| STRIPE[Stripe Checkout]
+  STRIPE -->|POST /api/stripe/webhook| API
 
-  API --> DB[(PostgreSQL - Render)]
-  API --> O[(orders)]
-  API --> IL[(integrations_log)]
-  API --> G[GA4 MP]
-  API --> M[Meta CAPI]
+  API --> DB[(PostgreSQL en Render)]
+  API --> LOGS[(integrations_log)]
+  API --> ORD[(orders)]
 
-  A[TrackSure Admin - Vercel] -->|REST /api/admin/*| API
+  API --> GA4[GA4 Measurement Protocol]
+  API --> META[Meta CAPI]
+
+  D[TrackSure Dashboard en Vercel] -->|GET /api/admin/*| API
 ```
 
-## Decisiones tecnicas clave
+## E) Componentes del repositorio
 
-| Decision | Por que importa |
-|---|---|
-| Tracking server-side con `eventId` | Mantiene correlacion estable entre sesiones, eventos y pagos. |
-| Stripe webhook idempotente (`stripe_event_id` PK) | Evita doble procesamiento y ordenes duplicadas. |
-| `orders.business_status` canonico | Simplifica reporting operativo (`SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`). |
-| Flyway para migraciones | Controla cambios de esquema por version y permite rollback operativo. |
-| `integrations_log` para auditoria | Guarda request/response y estado de envios a GA4 MP y Meta CAPI. |
-| Separacion `tracking_session` / `tracking_event` / `orders` | Mantiene modelo claro entre atribucion, comportamiento y revenue. |
-| Backend + PostgreSQL en Render | Despliegue estable con endpoint publico para webhooks Stripe. |
+- `backend/`: TrackSure API (Spring Boot 3 + Java 17).
+- `frontend/landing/`: sitio de entrada y captura inicial de tracking.
+- `frontend/admin/`: TrackSure Intelligence Dashboard (operacion y auditoria).
+- `infra/`: arquitectura, modelo de datos y guias tecnicas.
 
-## Endpoints principales
+### Decision sobre `/BDD`
+
+Se mantiene la carpeta `/BDD` como carpeta operativa para desarrollo local.
+Incluye scripts SQL de apoyo (`schema.sql`, `reset.sql`) y guia de uso en DEV.
+La fuente de verdad de produccion sigue siendo Flyway en `backend/src/main/resources/db/migration`.
+
+## F) Modelo de datos y migraciones
+
+- Motor principal: PostgreSQL (Render).
+- Migraciones: Flyway (`V1` a `V9`).
+- Tablas clave:
+  - `tracking_session`
+  - `tracking_event`
+  - `orders`
+  - `stripe_webhook_event`
+  - `integrations_log`
+
+Referencia completa del modelo:
+- [`infra/modelo_bdd.md`](./infra/modelo_bdd.md)
+
+## G) Endpoints y ejemplos
+
+### Tabla de endpoints principales
 
 | Metodo | Endpoint | Proposito | Seguridad |
 |---|---|---|---|
-| `POST` | `/api/track` | Registra evento de funnel y mantiene `tracking_session`/`tracking_event`. | Publico + rate limit |
-| `POST` | `/api/stripe/webhook` | Procesa webhook Stripe, actualiza `orders` y dispara integraciones. | Publico + firma Stripe |
-| `GET` | `/api/admin/health` | Health de autenticacion admin. | Basic Auth (`ADMIN`) |
+| `POST` | `/api/track` | Registra eventos del funnel y mantiene sesion por `eventId`. | Publico + rate limit |
+| `POST` | `/api/stripe/webhook` | Procesa webhook Stripe, actualiza ordenes y logs. | Publico + firma Stripe |
+| `GET` | `/api/admin/health` | Verificacion de acceso admin. | Basic Auth (`ADMIN`) |
 | `GET` | `/api/admin/sessions` | Lista sesiones con filtros y paginacion. | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/sessions/{eventId}` | Trazabilidad completa por `eventId`. | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/events` | Lista eventos con filtros y paginacion. | Basic Auth (`ADMIN`) |
-| `GET` | `/api/admin/metrics` | KPIs agregados para dashboard. | Basic Auth (`ADMIN`) |
-| `GET` | `/api/health/db` | Estado de conexion a PostgreSQL. | Publico |
-| `GET` | `/actuator/health` | Health endpoint de plataforma. | Publico |
+| `GET` | `/api/admin/sessions/{eventId}` | Trazabilidad completa de una sesion. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/events` | Lista eventos por tipo/rango. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/metrics` | KPIs agregados del dashboard. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/health/db` | Health de DB (`SELECT 1`). | Publico |
+| `GET` | `/actuator/health` | Health de plataforma. | Publico |
 
-Swagger no esta habilitado en el deploy actual.
+### `POST /api/track` (ejemplo minimo)
 
-## Base de datos
+```bash
+curl -X POST "http://localhost:8080/api/track" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "landing_view",
+    "utm_source": "google",
+    "utm_medium": "cpc",
+    "utm_campaign": "spring_sale",
+    "landing_path": "/"
+  }'
+```
 
-- Motor: PostgreSQL (Render).
-- Versionado de esquema: Flyway (`backend/src/main/resources/db/migration`).
-- Fuente de verdad del modelo: [`infra/modelo_bdd.md`](./infra/modelo_bdd.md).
-- Tablas core: `tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`, `integrations_log`.
+### `POST /api/stripe/webhook` (firma Stripe)
 
-## Setup local
+```bash
+curl -X POST "http://localhost:8080/api/stripe/webhook" \
+  -H "Content-Type: application/json" \
+  -H "Stripe-Signature: t=1700000000,v1=<firma_generada_por_stripe>" \
+  --data-binary @payload.json
+```
+
+Nota: el header `Stripe-Signature` debe ser valido y corresponder a `STRIPE_WEBHOOK_SECRET`.
+
+### `GET /api/admin/*` (Basic Auth)
+
+```bash
+curl -u "${ADMIN_USER}:${ADMIN_PASS}" \
+  "http://localhost:8080/api/admin/health"
+```
+
+### Health checks
+
+```bash
+curl "http://localhost:8080/api/health/db"
+curl "http://localhost:8080/actuator/health"
+```
+
+### Swagger
+
+Swagger no esta habilitado en el estado actual.
+Opcionalmente, puede habilitarse agregando `springdoc-openapi` al backend y exponiendo `/swagger-ui/index.html`.
+
+## H) Variables de entorno
+
+### Minimas para produccion (Render)
+
+- `PORT` (inyectado por Render)
+- `SPRING_DATASOURCE_URL` (JDBC valido: `jdbc:postgresql://host:port/db`)
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `ADMIN_USER`
+- `ADMIN_PASS`
+- `STRIPE_WEBHOOK_SECRET`
+
+### Opcionales (integraciones y tuning)
+
+- `TRACKING_ENABLED`
+- `GA4_MP_ENABLED`
+- `GA4_MEASUREMENT_ID`
+- `GA4_API_SECRET`
+- `GA4_MP_DEBUG_VALIDATION_ENABLED`
+- `META_CAPI_ENABLED`
+- `META_PIXEL_ID`
+- `META_ACCESS_TOKEN`
+- `PIPEDRIVE_ENABLED`
+- `PIPEDRIVE_API_TOKEN`
+- `CORS_ALLOWED_ORIGINS`
+
+### Fallback de datasource (si no se define `SPRING_DATASOURCE_URL`)
+
+- `PGHOST`
+- `PGPORT`
+- `PGDATABASE`
+- `PGUSER`
+- `PGPASSWORD`
+
+## I) Como correr local
 
 ### Requisitos
 
 - Java 17+
 - Maven 3.9+
 - Node.js 20+
-- PostgreSQL local disponible
+- PostgreSQL local
 
-### Backend (`/backend`)
+### 1. Backend (TrackSure API)
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-Variables de entorno soportadas:
-
-1. Opcion recomendada (`SPRING_DATASOURCE_URL` + credenciales)
-2. Opcion fallback (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`)
-
-Ejemplo:
+Ejemplo rapido:
 
 ```bash
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/app_db
 SPRING_DATASOURCE_USERNAME=postgres
 SPRING_DATASOURCE_PASSWORD=postgres
+ADMIN_USER=admin
+ADMIN_PASS=admin123
 ```
 
-Ejemplo `application.yml`:
-
-```yaml
-spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:app_db}}
-    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:postgres}}
-```
-
-### Landing (`/frontend/landing`)
+### 2. Landing
 
 ```bash
 cd frontend/landing
@@ -125,14 +204,14 @@ npm install
 npm run dev
 ```
 
-`.env` esperado:
+`.env` sugerido:
 
 ```bash
 VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 ```
 
-### Admin (`/frontend/admin`)
+### 3. TrackSure Intelligence Dashboard
 
 ```bash
 cd frontend/admin
@@ -140,40 +219,55 @@ npm install
 npm run dev
 ```
 
-`.env` esperado:
+`.env` sugerido:
 
 ```bash
 VITE_API_URL=http://localhost:8080
 ```
 
-## Despliegue
+## J) Deploy (Render / Vercel)
 
-### Render (backend + DB)
+### Render (TrackSure API + PostgreSQL)
 
-- Web Service conectado al repositorio GitHub.
-- Base PostgreSQL provisionada en Render.
-- Variables configuradas en dashboard Render (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `ADMIN_USER`, `ADMIN_PASS`, `STRIPE_WEBHOOK_SECRET`, etc.).
-- Stripe webhook debe apuntar a:
-  - `https://<backend-render>/api/stripe/webhook`
+- El backend escucha en `server.port=${PORT:8080}`.
+- Render inyecta `PORT` automaticamente.
+- Configurar datasource con:
+  - `SPRING_DATASOURCE_URL=jdbc:postgresql://<host>:5432/<db>?sslmode=require`
+  - `SPRING_DATASOURCE_USERNAME`
+  - `SPRING_DATASOURCE_PASSWORD`
+- Stripe debe enviar webhook a:
+  - `https://<tu-servicio-render>/api/stripe/webhook`
 
-### Vercel (frontends)
+### Vercel (Landing + TrackSure Intelligence Dashboard)
 
-- `frontend/landing` y `frontend/admin` desplegados como proyectos separados.
-- `VITE_API_URL` debe apuntar al backend en Render.
+- `frontend/landing` y `frontend/admin` en proyectos separados.
+- En ambos, `VITE_API_URL` debe apuntar al backend en Render.
+
+## K) Observabilidad y auditoria
+
+La trazabilidad operativa se apoya en dos tablas:
+
+- `stripe_webhook_event`: estado de recepcion/procesamiento por `stripe_event_id`.
+- `integrations_log`: evidencia de envios a GA4 MP / Meta CAPI (status, http_status, payloads).
+
+Esto permite responder rapidamente:
+
+- si un webhook fue recibido o deduplicado,
+- si una orden quedo en `SUCCESS/PENDING/FAILED/UNKNOWN`,
+- si las integraciones externas enviaron correctamente.
+
+## L) Roadmap / pendientes
+
+- Ampliar tests de integracion end-to-end (track -> webhook -> integraciones).
+- Incorporar pruebas de carga y resiliencia de webhooks.
+- Habilitar Swagger de forma opcional para DX.
+- Validar usabilidad del dashboard con usuarios operativos.
 
 ## URLs de referencia
 
 | Recurso | URL |
 |---|---|
 | Landing | https://s02-26-equipo-15-web-app-developmen.vercel.app/ |
-| Admin | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
-| API | https://s02-26-equipo-15-web-app-development.onrender.com |
-| API Health | https://s02-26-equipo-15-web-app-development.onrender.com/actuator/health |
-
-## Documentacion por modulo
-
-- [`backend/README.md`](./backend/README.md)
-- [`frontend/landing/README.md`](./frontend/landing/README.md)
-- [`frontend/admin/README.md`](./frontend/admin/README.md)
-- [`BDD/README.md`](./BDD/README.md)
-- [`infra/README.md`](./infra/README.md)
+| TrackSure Dashboard | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
+| TrackSure API | https://s02-26-equipo-15-web-app-development.onrender.com |
+| Health API | https://s02-26-equipo-15-web-app-development.onrender.com/actuator/health |

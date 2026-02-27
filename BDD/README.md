@@ -1,78 +1,42 @@
-# BDD - TrackSure
+# BDD (operacion DEV)
 
-Documentacion del esquema de base de datos para tracking, ordenes e integraciones.
+Esta carpeta se mantiene como apoyo operativo para desarrollo local.
 
-## Objetivo
+## Alcance
 
-Esta carpeta centraliza la referencia del modelo SQL y su uso operativo para ambientes locales y produccion.
+- Scripts SQL para entornos de desarrollo y pruebas manuales.
+- No reemplaza Flyway en produccion.
+- Fuente de verdad productiva: `backend/src/main/resources/db/migration`.
 
-## Contenido
+## Archivos
 
-- `descripcion_bdd.md`: descripcion funcional del modelo.
-- `pgcrypto.sql`: script de bootstrap/local para pruebas manuales.
-- `README.md`: guia de uso y conexion.
+- `schema.sql`: crea esquema de trabajo DEV (alineado al modelo actual).
+- `reset.sql`: limpia tablas de dominio para reinicio controlado en DEV.
+- `pgcrypto.sql`: script de bootstrap historico y referencia.
+- `descripcion_bdd.md`: explicacion funcional del modelo.
 
-## Fuente de verdad del esquema
+## Como exportar schema
 
-El esquema oficial se versiona con Flyway en:
-
-- `backend/src/main/resources/db/migration`
-
-Versiones actuales:
-
-- `V1` a `V9`.
-
-## Tablas core
-
-- `tracking_session`
-- `tracking_event`
-- `orders`
-- `stripe_webhook_event`
-- `integrations_log`
-
-## Conexion local vs Render
-
-### Local (desarrollo)
-
-Opciones recomendadas:
-
-1. `SPRING_DATASOURCE_URL` + `SPRING_DATASOURCE_USERNAME` + `SPRING_DATASOURCE_PASSWORD`
-2. Fallback con `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
-
-Ejemplo local:
+Desde una base local PostgreSQL:
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/app_db
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=postgres
+pg_dump --schema-only --no-owner --no-privileges \
+  -h localhost -p 5432 -U postgres app_db > BDD/schema_export.sql
 ```
 
-### Render (produccion)
-
-Ejemplo:
+## Como limpiar / resetear esquema en DEV
 
 ```bash
-SPRING_DATASOURCE_URL=jdbc:postgresql://<host-render>:5432/<db>?sslmode=require
-SPRING_DATASOURCE_USERNAME=<render_user>
-SPRING_DATASOURCE_PASSWORD=<render_password>
+psql -h localhost -p 5432 -U postgres -d app_db -f BDD/reset.sql
 ```
 
-## Ejemplo `application.yml`
+## Como restaurar en DEV
 
-```yaml
-spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:app_db}}
-    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:postgres}}
-  flyway:
-    enabled: true
+```bash
+psql -h localhost -p 5432 -U postgres -d app_db -f BDD/schema.sql
 ```
 
-## Referencias cruzadas
+## Notas
 
-- Modelo y diccionario: [`../infra/modelo_bdd.md`](../infra/modelo_bdd.md)
-- Arquitectura E2E: [`../infra/arquitectura_end-to-end.md`](../infra/arquitectura_end-to-end.md)
-- Backend: [`../backend/README.md`](../backend/README.md)
-
-`pgcrypto.sql` se usa como apoyo en bootstrap/local. En ambientes reales, el esquema debe aplicarse via Flyway.
+- Ejecutar estos scripts solo en desarrollo.
+- En ambientes reales, usar Flyway y no aplicar SQL manual.
