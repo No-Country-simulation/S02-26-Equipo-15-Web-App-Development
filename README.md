@@ -409,6 +409,9 @@ _Timeline end-to-end con eventos, webhook e integraciones._
 `integrations_log` registra evidencia de envios server-side (GA4 MP, Meta CAPI y Pipedrive si aplica).  
 `status` esperado: `SENT`, `SENT_WITH_WARNINGS`, `SKIPPED` o `FAILED`.
 
+![Integrations log correlacionada por eventId](./infra/demo/db-01-integrations-log.png)
+_Validacion puntual de la integrations_log persistida y su relacion con  `reference_id`._
+
 ```sql
 -- Traza completa por event_id
 WITH target AS (
