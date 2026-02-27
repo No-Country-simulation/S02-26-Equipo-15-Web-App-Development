@@ -1,149 +1,174 @@
 <p align="center">
-  <img src="./infra/assets/notcountry-readme-header.svg" alt="S02-26-Equipo 15 - Web App Development" width="100%" />
+  <img src="./infra/assets/notcountry-readme-header.svg" alt="TrackSure" width="100%" />
 </p>
 
+# TrackSure - Revenue Attribution & Server-Side Conversion Tracking
 
-# NoCountry Growth Observability Platform
-Plataforma para attribution y conversion server-side: captura trafico con contexto de campana, correlaciona pagos Stripe con `eventId` y expone trazabilidad operativa en un panel admin con metricas de negocio para optimizar inversion en ads con datos reales.
+TrackSure conecta navegacion, checkout y confirmacion de pago en un solo flujo auditable por `eventId`.  
+El producto combina tracking en landing, procesamiento Stripe webhook idempotente, persistencia en PostgreSQL y observabilidad operativa en un dashboard admin.
 
-## Problema
+## Problema que resuelve
 
-Aumentar las conversiones del ecommerce.
+En ecommerce y campanas pagas, la atribucion se rompe por varios motivos:
 
-## Descripción
+- El tracking solo browser-side pierde eventos por cookies, ITP y adblockers.
+- Stripe redirige fuera del sitio y corta la trazabilidad del funnel.
+- Sin correlacion sesion-evento-pago no se puede saber que campana genero revenue real.
+- Los equipos de growth y operaciones no tienen auditoria tecnica de punta a punta.
 
-Somos una all in one solution de incorporation, tax y bookkeeping en USA. Queremos mejorar nuestro ecommerce para dirigir tráfico con ads y mejorar la conversión. Es importante lograr que tanto Google como Meta puedan mediante el pixel hacer el conteo de los pagos que ingresan al pagar vía Stripe.
+## Como lo resuelve TrackSure
 
-## Cómo lo desarrollado resuelve el problema
+- Genera y conserva un `eventId` para correlacionar todo el flujo.
+- Registra eventos de funnel (`landing_view`, `click_cta`, `begin_checkout`, `purchase`).
+- Procesa webhooks Stripe con validacion de firma e idempotencia.
+- Normaliza el estado de negocio en `orders.business_status`.
+- Envia conversion server-side a GA4 MP y Meta CAPI.
+- Expone consultas admin para auditoria por sesion, evento, orden e integraciones.
 
-- Captura de atribucion desde landing con contexto UTM y `eventId` para no perder trazabilidad.
-- Correlacion de `eventId` entre navegacion, checkout y webhook para medir conversion real.
-- Procesamiento de Stripe webhook idempotente para evitar duplicados en ordenes e ingresos.
-- Confirmacion server-side de conversiones en GA4 Measurement Protocol y Meta CAPI.
-- Panel admin sobre `/api/admin/**` para auditar sesiones, eventos, revenue y `orders.business_status`.
-
-## Estado actual / MVP
-
-- [x] Landing (`frontend/landing`): captura UTM y dispara eventos de funnel.
-- [x] Admin panel (`frontend/admin`): consulta sesiones, eventos, ordenes y estado de integraciones.
-- [x] Backend API (`backend`): tracking, Stripe webhook idempotente, auth admin Basic.
-- [x] Base de datos (`BDD` + Flyway): esquema versionado para `tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`, `integrations_log`.
-
-## Componentes
-
-- Landing: [`frontend/landing`](./frontend/landing)
-- Admin panel: [`frontend/admin`](./frontend/admin)
-- Backend API: [`backend`](./backend)
-- Base de datos + esquema: [`BDD`](./BDD)
-
-## Arquitectura de alto nivel
+## Arquitectura
 
 ```mermaid
 flowchart LR
-  U[Usuario] --> L[Landing React/Vite]
-  O[Operador] --> AD[Admin React/Vite]
+  U[Usuario] --> L[Landing - React/Vite]
+  L -->|POST /api/track| API[TrackSure API - Spring Boot]
+  L -->|Stripe Checkout| ST[Stripe]
+  ST -->|Webhook firmado| API
 
-  L -->|POST /api/track| API[Backend Spring Boot]
-  L -->|Checkout| ST[Stripe]
-  ST -->|Webhooks firmados| API
+  API --> DB[(PostgreSQL - Render)]
+  API --> O[(orders)]
+  API --> IL[(integrations_log)]
+  API --> G[GA4 MP]
+  API --> M[Meta CAPI]
 
-  L --> GAC[GA4 client]
-  L --> MPC[Meta Pixel client]
-
-  API --> DB[(PostgreSQL + Flyway)]
-  API --> GASS[GA4 MP]
-  API --> MCAPI[Meta CAPI]
-
-  AD -->|GET /api/admin/*| API
+  A[TrackSure Admin - Vercel] -->|REST /api/admin/*| API
 ```
 
-## Flujo de negocio y datos
+## Decisiones tecnicas clave
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant U as Usuario
-  participant L as Landing
-  participant API as Backend
-  participant ST as Stripe
-  participant DB as PostgreSQL
-  participant GA as GA4 MP
-  participant META as Meta CAPI
-  participant AD as Admin
+| Decision | Por que importa |
+|---|---|
+| Tracking server-side con `eventId` | Mantiene correlacion estable entre sesiones, eventos y pagos. |
+| Stripe webhook idempotente (`stripe_event_id` PK) | Evita doble procesamiento y ordenes duplicadas. |
+| `orders.business_status` canonico | Simplifica reporting operativo (`SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`). |
+| Flyway para migraciones | Controla cambios de esquema por version y permite rollback operativo. |
+| `integrations_log` para auditoria | Guarda request/response y estado de envios a GA4 MP y Meta CAPI. |
+| Separacion `tracking_session` / `tracking_event` / `orders` | Mantiene modelo claro entre atribucion, comportamiento y revenue. |
+| Backend + PostgreSQL en Render | Despliegue estable con endpoint publico para webhooks Stripe. |
 
-  U->>L: Visita landing
-  L->>API: /api/track (landing_view)
-  API->>DB: upsert tracking_session + insert tracking_event
-  API-->>L: eventId
+## Endpoints principales
 
-  U->>L: Click CTA / begin checkout
-  L->>ST: Redireccion con client_reference_id=eventId
-  ST->>API: webhook de estado de pago
-  API->>DB: upsert orders + log webhook (idempotente)
+| Metodo | Endpoint | Proposito | Seguridad |
+|---|---|---|---|
+| `POST` | `/api/track` | Registra evento de funnel y mantiene `tracking_session`/`tracking_event`. | Publico + rate limit |
+| `POST` | `/api/stripe/webhook` | Procesa webhook Stripe, actualiza `orders` y dispara integraciones. | Publico + firma Stripe |
+| `GET` | `/api/admin/health` | Health de autenticacion admin. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/sessions` | Lista sesiones con filtros y paginacion. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/sessions/{eventId}` | Trazabilidad completa por `eventId`. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/events` | Lista eventos con filtros y paginacion. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/admin/metrics` | KPIs agregados para dashboard. | Basic Auth (`ADMIN`) |
+| `GET` | `/api/health/db` | Estado de conexion a PostgreSQL. | Publico |
+| `GET` | `/actuator/health` | Health endpoint de plataforma. | Publico |
 
-  alt pago exitoso
-    API->>GA: purchase server-side
-    API->>META: purchase server-side
-    API->>DB: integrations_log = SENT
-  else pago pendiente/intermedio
-    API->>DB: business_status = PENDING
-  else pago fallido
-    API->>DB: business_status = FAILED
-  end
+Swagger no esta habilitado en el deploy actual.
 
-  AD->>API: consulta sesiones/eventos/metricas
-  API->>DB: lectura consolidada
-  API-->>AD: trazabilidad completa por eventId
+## Base de datos
+
+- Motor: PostgreSQL (Render).
+- Versionado de esquema: Flyway (`backend/src/main/resources/db/migration`).
+- Fuente de verdad del modelo: [`infra/modelo_bdd.md`](./infra/modelo_bdd.md).
+- Tablas core: `tracking_session`, `tracking_event`, `orders`, `stripe_webhook_event`, `integrations_log`.
+
+## Setup local
+
+### Requisitos
+
+- Java 17+
+- Maven 3.9+
+- Node.js 20+
+- PostgreSQL local disponible
+
+### Backend (`/backend`)
+
+```bash
+cd backend
+mvn spring-boot:run
 ```
 
-## Links
+Variables de entorno soportadas:
+
+1. Opcion recomendada (`SPRING_DATASOURCE_URL` + credenciales)
+2. Opcion fallback (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`)
+
+Ejemplo:
+
+```bash
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/app_db
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=postgres
+```
+
+Ejemplo `application.yml`:
+
+```yaml
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:app_db}}
+    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:postgres}}
+```
+
+### Landing (`/frontend/landing`)
+
+```bash
+cd frontend/landing
+npm install
+npm run dev
+```
+
+`.env` esperado:
+
+```bash
+VITE_API_URL=http://localhost:8080
+VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
+```
+
+### Admin (`/frontend/admin`)
+
+```bash
+cd frontend/admin
+npm install
+npm run dev
+```
+
+`.env` esperado:
+
+```bash
+VITE_API_URL=http://localhost:8080
+```
+
+## Despliegue
+
+### Render (backend + DB)
+
+- Web Service conectado al repositorio GitHub.
+- Base PostgreSQL provisionada en Render.
+- Variables configuradas en dashboard Render (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `ADMIN_USER`, `ADMIN_PASS`, `STRIPE_WEBHOOK_SECRET`, etc.).
+- Stripe webhook debe apuntar a:
+  - `https://<backend-render>/api/stripe/webhook`
+
+### Vercel (frontends)
+
+- `frontend/landing` y `frontend/admin` desplegados como proyectos separados.
+- `VITE_API_URL` debe apuntar al backend en Render.
+
+## URLs de referencia
 
 | Recurso | URL |
 |---|---|
-| Landing deploy | https://s02-26-equipo-15-web-app-developmen.vercel.app/ |
-| Admin deploy | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
-| API base URL | https://s02-26-equipo-15-web-app-development-desarrollo.up.railway.app |
-| Health check | https://s02-26-equipo-15-web-app-development-desarrollo.up.railway.app/actuator/health |
-| Swagger | No habilitado en deploy actual |
-
-## Levantar en local
-
-```bash
-# Backend (http://localhost:8080)
-cd backend
-mvn spring-boot:run
-
-# Landing (http://localhost:5173)
-cd ../frontend/landing
-npm install
-npm run dev
-
-# Admin (http://localhost:5174 o puerto libre de Vite)
-cd ../admin
-npm install
-npm run dev
-```
-
-## Integraciones
-
-- Stripe webhook: procesamiento idempotente por `stripeEventId` y actualizacion de `orders.business_status`.
-- GA4 Measurement Protocol: envio server-side de `purchase` cuando corresponde.
-- Meta CAPI: envio server-side de conversion para consistencia de atribucion.
-- Pipedrive: integracion existente por feature flag (`PIPEDRIVE_ENABLED`), deshabilitada por defecto hasta contar con token y definicion final de pipeline comercial.
-
-## KPIs / metricas del dashboard
-
-- Sesiones y eventos por rango.
-- Ordenes y revenue.
-- Distribucion de `orders.business_status` (`SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN`).
-- Conversion del funnel (`landing_view`, `click_cta`, `begin_checkout`, `purchase`).
-- Estado de `Integrations log` por `eventId`.
-
-## Roadmap
-
-- Endurecer observabilidad operativa y alertas de webhooks/integraciones.
-- Incorporar pruebas E2E de checkout y trazabilidad completa.
-- Cerrar rollout de Pipedrive en produccion.
+| Landing | https://s02-26-equipo-15-web-app-developmen.vercel.app/ |
+| Admin | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
+| API | https://s02-26-equipo-15-web-app-development.onrender.com |
+| API Health | https://s02-26-equipo-15-web-app-development.onrender.com/actuator/health |
 
 ## Documentacion por modulo
 
@@ -151,4 +176,4 @@ npm run dev
 - [`frontend/landing/README.md`](./frontend/landing/README.md)
 - [`frontend/admin/README.md`](./frontend/admin/README.md)
 - [`BDD/README.md`](./BDD/README.md)
-- [`infra/arquitectura_end-to-end.md`](./infra/arquitectura_end-to-end.md)
+- [`infra/README.md`](./infra/README.md)

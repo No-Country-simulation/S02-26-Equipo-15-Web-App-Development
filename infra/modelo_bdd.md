@@ -1,70 +1,71 @@
-# Modelo BDD (Actualizado)
+# Modelo BDD
 
-Documento alineado con el esquema real de Flyway (`V1`..`V7`) y el comportamiento actual del backend.
+Documento alineado con el esquema versionado en Flyway.
 
-## 1) Modelo relacional
+## 1) Modelo relacional (ERD)
 
 ```mermaid
 erDiagram
-  TRACKING_SESSION {
-    uuid event_id PK
-    timestamp created_at
-    timestamp last_seen_at
-    varchar attribution_context
-    varchar landing_path
-    varchar user_agent
-    varchar ip_hash
-  }
+    TRACKING_SESSION {
+        uuid event_id PK
+        timestamp created_at
+        timestamp last_seen_at
+        varchar attribution_context
+        varchar landing_path
+        varchar user_agent
+        varchar ip_hash
+    }
 
-  TRACKING_EVENT {
-    uuid id PK
-    uuid event_id FK
-    varchar event_type
-    timestamp created_at
-    varchar currency
-    numeric value
-    text payload_json
-  }
+    TRACKING_EVENT {
+        uuid id PK
+        uuid event_id FK
+        varchar event_type
+        timestamp created_at
+        varchar currency
+        numeric value
+        text payload_json
+    }
 
-  ORDERS {
-    uuid id PK
-    uuid event_id FK
-    varchar stripe_session_id UK
-    varchar payment_intent_id UK
-    numeric amount
-    varchar currency
-    varchar status
-    varchar business_status
-    timestamp created_at
-  }
+    ORDERS {
+        uuid id PK
+        uuid event_id FK
+        varchar stripe_session_id UK
+        varchar payment_intent_id UK
+        numeric amount
+        varchar currency
+        varchar status
+        varchar business_status
+        timestamp created_at
+    }
 
-  STRIPE_WEBHOOK_EVENT {
-    varchar stripe_event_id PK
-    uuid event_id
-    timestamp received_at
-    timestamp processed_at
-    varchar status
-    text error
-  }
+    STRIPE_WEBHOOK_EVENT {
+        varchar stripe_event_id PK
+        uuid event_id
+        timestamp received_at
+        timestamp processed_at
+        varchar status
+        text error
+    }
 
-  INTEGRATIONS_LOG {
-    uuid id PK
-    varchar integration
-    varchar reference_id
-    varchar status
-    int http_status
-    int latency_ms
-    jsonb request_payload
-    jsonb response_payload
-    text error_message
-    timestamp created_at
-  }
+    INTEGRATIONS_LOG {
+        uuid id PK
+        varchar integration
+        varchar reference_id
+        varchar status
+        int http_status
+        int latency_ms
+        jsonb request_payload
+        jsonb response_payload
+        text error_message
+        timestamp created_at
+    }
 
-  TRACKING_SESSION ||--o{ TRACKING_EVENT : has
-  TRACKING_SESSION ||--o{ ORDERS : links
+    TRACKING_SESSION ||--o{ TRACKING_EVENT : has
+    TRACKING_SESSION ||--o{ ORDERS : links
 ```
 
 Notas:
+
 - `stripe_webhook_event.event_id` es correlacion logica (no FK en DB).
 - `integrations_log.reference_id` es correlacion logica (normalmente `eventId` como texto).
 - En DB real, `orders.payment_intent_id` es unique parcial (`WHERE payment_intent_id IS NOT NULL`).
@@ -178,6 +179,8 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `V5__orders_payment_intent_unique.sql`: deduplica historico y crea unique parcial por `payment_intent_id`.
 - `V6__stripe_webhook_event_add_event_id.sql`: agrega `event_id` a webhooks para correlacion.
 - `V7__orders_add_business_status.sql`: agrega y normaliza `business_status`.
+- `V8__orders_fix_requires_payment_method_business_status.sql`: corrige normalizacion de estados failed.
+- `V9__orders_unpaid_business_status_pending.sql`: ajusta `unpaid` a estado de negocio `PENDING`.
 
 ## 6) SQL de verificacion operativa
 
