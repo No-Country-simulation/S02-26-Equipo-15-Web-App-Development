@@ -5,9 +5,8 @@ Inventario de capturas para la seccion `## 🚀 Demo en 2 minutos` del README pr
 | Archivo | Paso demo | Uso recomendado |
 |---|---|---|
 | `landing-01-home.png` | Paso 1 | Landing con CTA `Comenzar ahora`. |
-| `stripe-01-checkout-test-mode.png` | Paso 3 | Stripe Checkout en modo test con `client_reference_id` en URL. |
+| `stripe-01-checkout-test-mode.png` | Paso 2 | Stripe Checkout en modo test con `client_reference_id` en URL. |
 | `stripe-02-payment-success.png` | Paso 3 | Pantalla de pago exitoso en Stripe. |
-| `stripe-03-checkout-test-mode-alt.png` | Paso 3 (opcional) | Captura alternativa de checkout test. |
 | `admin-01-login.png` | Paso 4 | Login de TrackSure Dashboard. |
 | `admin-02-dashboard-kpis.png` | Paso 4 | KPI cards de dashboard (sesiones, eventos, ordenes, revenue). |
 | `admin-03-dashboard-business-status.png` | Paso 4 | Distribucion de `business_status` y leyenda. |
