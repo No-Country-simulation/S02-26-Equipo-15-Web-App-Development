@@ -6,10 +6,18 @@
 
 ## A) Resumen
 
-TrackSure es una plataforma de atribucion de revenue y tracking server-side para ecommerce.
-Conecta navegacion en landing, pagos en Stripe, persistencia en PostgreSQL y observabilidad operativa en un dashboard.
-Su objetivo es convertir datos dispersos en trazabilidad accionable para growth, marketing y operaciones.
-Cada conversion puede auditarse de punta a punta con una clave comun: `eventId`.
+TrackSure es una plataforma de atribucion de ingresos orientada a decisiones reales de negocio.
+Conecta navegacion en landing, conversion en Stripe y evidencia operativa en un mismo hilo de datos.
+El resultado es trazabilidad end-to-end para saber que campanas generan revenue y donde se pierde conversion.
+Cada sesion, evento y pago puede auditarse de punta a punta con una clave comun: `eventId`.
+
+## ¿Qué hace diferente a TrackSure?
+
+- Atribucion basada en ingresos reales (Stripe), no solo clicks.
+- Correlacion end-to-end con `eventId`.
+- Webhook idempotente para evitar ordenes duplicadas.
+- Auditoria de integraciones con evidencia de envios, latencia y estado.
+- Modelo de datos preparado para analisis de funnel y operacion diaria.
 
 ## B) Problema que resuelve
 
@@ -53,7 +61,7 @@ flowchart LR
 
 - `backend/`: TrackSure API (Spring Boot 3 + Java 17).
 - `frontend/landing/`: sitio de entrada y captura inicial de tracking.
-- `frontend/admin/`: TrackSure Intelligence Dashboard (operacion y auditoria).
+- `frontend/admin/`: TrackSure Dashboard (operacion y auditoria).
 - `infra/`: arquitectura, modelo de datos y guias tecnicas.
 
 ### Decision sobre `/BDD`
@@ -158,8 +166,6 @@ Opcionalmente, puede habilitarse agregando `springdoc-openapi` al backend y expo
 - `META_CAPI_ENABLED`
 - `META_PIXEL_ID`
 - `META_ACCESS_TOKEN`
-- `PIPEDRIVE_ENABLED`
-- `PIPEDRIVE_API_TOKEN`
 - `CORS_ALLOWED_ORIGINS`
 
 ### Fallback de datasource (si no se define `SPRING_DATASOURCE_URL`)
@@ -211,7 +217,7 @@ VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 ```
 
-### 3. TrackSure Intelligence Dashboard
+### 3. TrackSure Dashboard
 
 ```bash
 cd frontend/admin
@@ -238,23 +244,52 @@ VITE_API_URL=http://localhost:8080
 - Stripe debe enviar webhook a:
   - `https://<tu-servicio-render>/api/stripe/webhook`
 
-### Vercel (Landing + TrackSure Intelligence Dashboard)
+### Vercel (Landing + TrackSure Dashboard)
 
 - `frontend/landing` y `frontend/admin` en proyectos separados.
 - En ambos, `VITE_API_URL` debe apuntar al backend en Render.
 
-## K) Observabilidad y auditoria
+## Observabilidad y Auditoría
 
-La trazabilidad operativa se apoya en dos tablas:
+TrackSure registra evidencia operativa en tablas dedicadas para poder auditar cada conversion:
 
-- `stripe_webhook_event`: estado de recepcion/procesamiento por `stripe_event_id`.
-- `integrations_log`: evidencia de envios a GA4 MP / Meta CAPI (status, http_status, payloads).
+- `tracking_session` y `tracking_event`: contexto de navegacion y eventos del funnel.
+- `orders`: consolidacion de pago y estado de negocio (`business_status`).
+- `stripe_webhook_event`: recepcion, deduplicacion y resultado de procesamiento de webhooks.
+- `integrations_log`: registro de envios a GA4 MP y Meta CAPI con `status`, `httpStatus` y `latencyMs`.
 
-Esto permite responder rapidamente:
+Con esto el equipo puede:
 
-- si un webhook fue recibido o deduplicado,
-- si una orden quedo en `SUCCESS/PENDING/FAILED/UNKNOWN`,
-- si las integraciones externas enviaron correctamente.
+- demostrar si una conversion fue efectivamente procesada,
+- detectar fallas de integracion o demoras de entrega,
+- depurar discrepancias entre marketing, pagos y revenue,
+- seguir todo el flujo con `eventId` como hilo conductor tecnico y funcional.
+
+En TrackSure Dashboard, esta informacion se consulta por sesion y permite revisar estado de orden, webhooks e integraciones desde una sola vista.
+
+## Estrategia de Testing
+
+Actualmente existe cobertura focalizada en seguridad, idempotencia y consistencia de estados:
+
+- `SecurityConfigTest`: valida proteccion de `/api/admin/**` y acceso publico en endpoints criticos.
+- `StripeWebhookIdempotencyTest`: evita reprocesar el mismo evento de Stripe.
+- `OrderStatusTransitionTest`: valida transiciones correctas de `business_status`.
+- `TrackControllerTest` y `TrackingServiceTest`: protegen contrato y persistencia del tracking por `eventId`.
+
+Esto es clave para evitar dos riesgos de negocio: revenue duplicado por reprocesos y perdida de trazabilidad en conversiones.
+
+Ejecucion:
+
+```bash
+cd backend
+mvn test
+```
+
+Plan de tests para ampliar cobertura:
+
+- pruebas end-to-end del flujo `track -> webhook -> integraciones`,
+- pruebas de carga para picos de webhooks,
+- pruebas de resiliencia ante errores transitorios en integraciones externas.
 
 ## L) Roadmap / pendientes
 
@@ -262,6 +297,197 @@ Esto permite responder rapidamente:
 - Incorporar pruebas de carga y resiliencia de webhooks.
 - Habilitar Swagger de forma opcional para DX.
 - Validar usabilidad del dashboard con usuarios operativos.
+
+## Demo en 2 minutos
+
+### A) Requisitos previos
+
+- Landing (Vercel): https://s02-26-equipo-15-web-app-developmen.vercel.app/
+- Admin (Vercel): https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login
+- API (Render): https://s02-26-equipo-15-web-app-development.onrender.com
+- Variables minimas (si corres local): `VITE_API_URL`, `ADMIN_USER`, `ADMIN_PASS`, `STRIPE_WEBHOOK_SECRET`. Stripe test mode: tarjeta `4242 4242 4242 4242` (fecha futura, CVC cualquiera).
+
+### B) Paso 1 - Abrir Landing (10-15s)
+
+1. Abre la landing y valida el CTA principal `Comenzar ahora`.
+2. Verifica que la propuesta de valor y bloques de servicio cargan correctamente.
+
+![Landing de TrackSure](./infra/demo/landing-01-home.png)
+_Landing productiva en Vercel con CTA inicial del flujo._
+
+### C) Paso 2 - Generar evento (`POST /api/track`) (15-20s)
+
+`eventId` es la llave de correlacion end-to-end: une sesion, eventos, orden, webhook y `integrations_log`.
+
+Ejemplo Bash (`curl`) usando endpoint real en Render:
+
+```bash
+API_BASE="https://s02-26-equipo-15-web-app-development.onrender.com"
+
+RESPONSE=$(curl -sS -X POST "$API_BASE/api/track" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "landing_view",
+    "utm_source": "demo_jurado",
+    "utm_medium": "manual",
+    "utm_campaign": "demo_2min",
+    "landing_path": "/"
+  }')
+
+echo "$RESPONSE"
+EVENT_ID=$(echo "$RESPONSE" | sed -E 's/.*"eventId":"([^"]+)".*/\1/')
+echo "EVENT_ID=$EVENT_ID"
+```
+
+Ejemplo PowerShell (Windows):
+
+```powershell
+$apiBase = "https://s02-26-equipo-15-web-app-development.onrender.com"
+$body = @{
+  eventType    = "landing_view"
+  utm_source   = "demo_jurado"
+  utm_medium   = "manual"
+  utm_campaign = "demo_2min"
+  landing_path = "/"
+} | ConvertTo-Json
+
+$response = Invoke-RestMethod -Method Post -Uri "$apiBase/api/track" -ContentType "application/json" -Body $body
+$eventId = $response.eventId
+$eventId
+```
+
+Guarda este `eventId`, lo usaremos para rastrear todo.
+
+### D) Paso 3 - Completar pago Stripe (modo test) (20-30s)
+
+1. Haz click en `Comenzar ahora` desde la landing o abre el payment link test:
+   `https://buy.stripe.com/test_dRm6oH5bY54Wc84e1p4ow00`
+2. Confirma que la URL de checkout incluye `client_reference_id=<eventId>`.
+3. Completa el pago con tarjeta test `4242 4242 4242 4242`.
+
+Como se propaga el `eventId` a Stripe en este proyecto:
+- Frontend landing agrega `client_reference_id` y `nc_event_id` al payment link.
+- Backend webhook correlaciona desde `client_reference_id` y tambien soporta `metadata.eventId|event_id|client_reference_id|tracking_event_id`.
+
+![Stripe Checkout en modo test](./infra/demo/stripe-01-checkout-test-mode.png)
+_Checkout en modo test con `client_reference_id` visible en la URL._
+
+![Pago exitoso en Stripe](./infra/demo/stripe-02-payment-success.png)
+_Confirmacion de pago exitoso antes de revisar admin y BDD._
+
+### E) Paso 4 - Ver orden en Dashboard Admin (20-30s)
+
+1. Login admin: https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login
+2. Dashboard: valida KPIs (`Total ordenes`, `Revenue total`) y distribucion por `business_status`.
+3. Sessions: busca por `eventId`, revisa estado (`SUCCESS/FAILED/PENDING/UNKNOWN`) y abre `Ver trazabilidad`.
+4. Events: confirma `purchase` y su `orderId`.
+5. Trace View: valida correlacion de IDs (eventId, orderId, payment_intent_id, stripe_session_id) y timeline completo.
+
+![Login Admin](./infra/demo/admin-01-login.png)
+_Ingreso al panel con credenciales configuradas en backend (`ADMIN_USER` / `ADMIN_PASS`)._
+
+![Dashboard KPI cards](./infra/demo/admin-02-dashboard-kpis.png)
+_KPIs operativos para sesiones, eventos, ordenes e ingresos._
+
+![Dashboard business status](./infra/demo/admin-03-dashboard-business-status.png)
+_Distribucion de `business_status` para lectura rapida de salud operativa._
+
+![Sessions](./infra/demo/admin-04-sessions-list.png)
+_Busqueda por `eventId` y acceso a `Ver trazabilidad`._
+
+![Events](./infra/demo/admin-05-events-list.png)
+_Eventos de tracking y vinculacion con `orderId`._
+
+![Trace View](./infra/demo/admin-06-trace-view-overview.png)
+_Vista de correlacion (session info + IDs de negocio/pago)._
+
+![Trace Timeline](./infra/demo/admin-07-trace-view-timeline.png)
+_Timeline end-to-end con eventos, webhook e integraciones._
+
+### F) Paso 5 - Validar `integrations_log` en la BDD (15-20s)
+
+`integrations_log` registra evidencia de envios server-side (GA4 MP, Meta CAPI y Pipedrive si aplica).  
+`status` esperado: `SENT`, `SENT_WITH_WARNINGS`, `SKIPPED` o `FAILED`.
+
+```sql
+-- Traza completa por event_id
+WITH target AS (
+  SELECT 'c5cdfb3f-67e0-4de4-bd26-8ae665b622ae'::uuid AS event_id
+)
+SELECT
+  'tracking_session' AS section,
+  ts.event_id::text AS ref_1,
+  NULL::text AS ref_2,
+  NULL::text AS status,
+  ts.created_at AS ts,
+  NULL::text AS detail
+FROM tracking_session ts
+JOIN target t ON ts.event_id = t.event_id
+UNION ALL
+SELECT
+  'tracking_event' AS section,
+  te.event_id::text AS ref_1,
+  te.event_type AS ref_2,
+  COALESCE(te.currency, '') AS status,
+  te.created_at AS ts,
+  COALESCE(te.value::text, '') AS detail
+FROM tracking_event te
+JOIN target t ON te.event_id = t.event_id
+UNION ALL
+SELECT
+  'orders' AS section,
+  o.event_id::text AS ref_1,
+  COALESCE(o.payment_intent_id, o.stripe_session_id) AS ref_2,
+  COALESCE(o.business_status, o.status) AS status,
+  o.created_at AS ts,
+  'stripe_session=' || COALESCE(o.stripe_session_id, '') AS detail
+FROM orders o
+JOIN target t ON o.event_id = t.event_id
+UNION ALL
+SELECT
+  'ga4_mp' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'GA4_MP'
+UNION ALL
+SELECT
+  'meta_capi' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'META_CAPI'
+UNION ALL
+SELECT
+  'stripe_webhook_event' AS section,
+  swe.event_id::text AS ref_1,
+  swe.stripe_event_id AS ref_2,
+  swe.status AS status,
+  swe.received_at AS ts,
+  COALESCE(swe.error, '') AS detail
+FROM stripe_webhook_event swe
+JOIN target t ON swe.event_id = t.event_id
+ORDER BY ts DESC;
+```
+
+![Traza completa por eventId](./infra/demo/db-03-trace-query-result.png)
+_Auditoria consolidada del flujo E2E por `eventId`._
+
+Lectura rapida de esta captura (comportamiento esperado):
+- `tracking_event` con 2 filas es normal: una para `landing_view` y otra para `purchase`.
+- `stripe_webhook_event` con 2 filas tambien es normal: Stripe puede enviar mas de un evento del mismo pago (por ejemplo `payment_intent.*` y `checkout.session.completed`), cada uno con `stripe_event_id` distinto.
+- Lo que no debe duplicarse es la orden: debe mantenerse 1 fila en `orders` por `payment_intent_id`/`stripe_session_id`.
+
+![Order correlacionada por eventId](./infra/demo/db-02-order-by-event-id.png)
+_Validacion puntual de la orden persistida y su relacion con `event_id`._
 
 ## URLs de referencia
 
