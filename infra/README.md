@@ -15,9 +15,6 @@ Indice de documentacion tecnica de arquitectura, modelo de datos y consultas ope
 - [`resumen_end_to_end.md`](./resumen_end_to_end.md)
   - Checklist operativo y consultas de verificacion rapida.
 
-- [`../BDD/README.md`](../BDD/README.md)
-  - Guia de conexion local/Render y relacion con migraciones.
-
 ## Diagramas
 
 - Arquitectura de alto nivel y secuencia de negocio: `arquitectura_end-to-end.md`.
