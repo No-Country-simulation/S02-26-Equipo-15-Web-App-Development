@@ -11,7 +11,13 @@ erDiagram
         uuid event_id PK
         timestamp created_at
         timestamp last_seen_at
-        varchar attribution_context
+        varchar utm_source
+        varchar utm_medium
+        varchar utm_campaign
+        varchar utm_term
+        varchar utm_content
+        varchar gclid
+        varchar fbclid
         varchar landing_path
         varchar user_agent
         varchar ip_hash
@@ -69,33 +75,40 @@ erDiagram
 
 ```mermaid
 flowchart LR
-  TRACK[POST /api/track] --> TE[(tracking_event)]
-  TRACK --> TS[(tracking_session)]
+  TRACK[POST /api/track] --> TS[(tracking_session)]
+  TRACK --> TE[(tracking_event)]
 
   STRIPE[POST /api/stripe/webhook] --> SWE[(stripe_webhook_event)]
   STRIPE --> ORD[(orders)]
-
-  ORD --> INT[(integrations_log)]
+  STRIPE --> TEP[(tracking_event purchase)]
+  STRIPE --> INT[(integrations_log)]
 ```
 
 Notas:
 
 - `stripe_webhook_event.event_id` es correlacion logica (no FK en DB).
-- `integrations_log.reference_id` es correlacion logica (normalmente `eventId` como texto).
+- `integrations_log.reference_id` es correlacion logica (normalmente `eventId`, y como fallback puede ser `stripe_session_id`).
 - En DB real, `orders.payment_intent_id` es unique parcial (`WHERE payment_intent_id IS NOT NULL`).
+- Es normal ver mas de una fila en `stripe_webhook_event` para un mismo `event_id`: son distintos eventos de Stripe (ids diferentes).
 
 ## 3) Diccionario de tablas
 
 ### `tracking_session`
 
-Tabla de sesion/attribution por `event_id`.
+Tabla de sesion/attribution por `event_id` (first-touch + metadata tecnica).
 
 | Columna | Tipo | Nulo | Regla |
 |---|---|---|---|
 | `event_id` | `uuid` | No | PK |
 | `created_at` | `timestamp` | No | primera vez vista |
 | `last_seen_at` | `timestamp` | No | ultima actividad |
-| `attribution_context` | `varchar(255)` | Si | first-touch (resumen) |
+| `utm_source` | `varchar(255)` | Si | first-touch |
+| `utm_medium` | `varchar(255)` | Si | first-touch |
+| `utm_campaign` | `varchar(255)` | Si | first-touch |
+| `utm_term` | `varchar(255)` | Si | first-touch |
+| `utm_content` | `varchar(255)` | Si | first-touch |
+| `gclid` | `varchar(255)` | Si | click id Google Ads |
+| `fbclid` | `varchar(255)` | Si | click id Meta |
 | `landing_path` | `varchar(1024)` | Si | ruta de entrada |
 | `user_agent` | `varchar(1024)` | Si | metadata request |
 | `ip_hash` | `varchar(64)` | Si | hash de IP |
@@ -126,7 +139,7 @@ Ordenes derivadas de webhooks de Stripe.
 | `payment_intent_id` | `varchar(255)` | Si | UNIQUE parcial (`IS NOT NULL`) |
 | `amount` | `numeric` | No | monto |
 | `currency` | `varchar(16)` | No | moneda |
-| `status` | `varchar(64)` | No | estado Stripe crudo |
+| `status` | `varchar(64)` | No | estado Stripe crudo (`PAID`, `SUCCEEDED`, `UNPAID`, etc.) |
 | `business_status` | `varchar(32)` | No | `SUCCESS`, `PENDING`, `FAILED`, `UNKNOWN` |
 | `created_at` | `timestamp` | No | fecha de alta |
 
@@ -137,7 +150,7 @@ Bitacora de procesamiento de webhooks.
 | Columna | Tipo | Nulo | Regla |
 |---|---|---|---|
 | `stripe_event_id` | `varchar(255)` | No | PK, idempotencia webhook |
-| `event_id` | `uuid` | Si | correlacion con sesion |
+| `event_id` | `uuid` | Si | correlacion con sesion/orden |
 | `received_at` | `timestamp` | No | recibido |
 | `processed_at` | `timestamp` | Si | procesado |
 | `status` | `varchar(32)` | No | `RECEIVED`, `PROCESSED`, `FAILED` |
@@ -145,12 +158,12 @@ Bitacora de procesamiento de webhooks.
 
 ### `integrations_log`
 
-Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
+Auditoria de integraciones server-side.
 
 | Columna | Tipo | Nulo | Regla |
 |---|---|---|---|
 | `id` | `uuid` | No | PK |
-| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP` |
+| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP`, `PIPEDRIVE` |
 | `reference_id` | `varchar(255)` | Si | correlacion (`eventId` u otra clave) |
 | `status` | `varchar(32)` | No | `SENT`, `FAILED`, `SKIPPED`, `SENT_WITH_WARNINGS` |
 | `http_status` | `int` | Si | codigo HTTP |
@@ -167,6 +180,7 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `orders.stripe_session_id` evita duplicar orden por checkout session.
 - `orders.payment_intent_id` (unique parcial) evita duplicar orden por payment intent.
 - `orders.business_status` normaliza `status` de Stripe para uso de negocio.
+- `integrations_log` registra cada intento de envio y su estado final (`SENT`, `SKIPPED`, `FAILED`, etc.).
 
 ## 5) Indices activos
 
@@ -193,8 +207,8 @@ Auditoria de integraciones server-side (Meta CAPI y Google Analytics 4 MP).
 - `V5__orders_payment_intent_unique.sql`: deduplica historico y crea unique parcial por `payment_intent_id`.
 - `V6__stripe_webhook_event_add_event_id.sql`: agrega `event_id` a webhooks para correlacion.
 - `V7__orders_add_business_status.sql`: agrega y normaliza `business_status`.
-- `V8__orders_fix_requires_payment_method_business_status.sql`: corrige normalizacion de estados failed.
-- `V9__orders_unpaid_business_status_pending.sql`: ajusta `unpaid` a estado de negocio `PENDING`.
+- `V8__orders_fix_requires_payment_method_business_status.sql`: corrige `REQUIRES_PAYMENT_METHOD` hacia `FAILED`.
+- `V9__orders_unpaid_business_status_pending.sql`: ajusta `UNPAID` hacia `PENDING`.
 
 ## 7) SQL de verificacion operativa
 
@@ -232,8 +246,33 @@ ORDER BY created_at DESC
 LIMIT 20;
 
 -- Integraciones recientes
-SELECT integration, reference_id, status, http_status, error_message, created_at
+SELECT integration, reference_id, status, http_status, latency_ms, error_message, created_at
 FROM integrations_log
 ORDER BY created_at DESC
 LIMIT 50;
+
+-- Traza completa por event_id
+WITH target AS (
+  SELECT 'TU_EVENT_ID'::uuid AS event_id
+)
+SELECT 'session' AS section, ts.event_id::text AS ref, ts.created_at AS ts, NULL::text AS status
+FROM tracking_session ts
+JOIN target t ON ts.event_id = t.event_id
+UNION ALL
+SELECT 'event', te.event_type, te.created_at, NULL::text
+FROM tracking_event te
+JOIN target t ON te.event_id = t.event_id
+UNION ALL
+SELECT 'order', COALESCE(o.payment_intent_id, o.stripe_session_id), o.created_at, o.business_status
+FROM orders o
+JOIN target t ON o.event_id = t.event_id
+UNION ALL
+SELECT 'integration', il.integration, il.created_at, il.status
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+UNION ALL
+SELECT 'webhook', swe.stripe_event_id, swe.received_at, swe.status
+FROM stripe_webhook_event swe
+JOIN target t ON swe.event_id = t.event_id
+ORDER BY ts DESC;
 ```
