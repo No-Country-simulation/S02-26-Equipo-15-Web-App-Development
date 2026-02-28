@@ -58,6 +58,13 @@ export function SessionTracePage() {
     }
   }, [detailQuery.data])
 
+  const sessionContext = useMemo(() => {
+    return {
+      customerEmail: resolveCustomerEmail(detailQuery.data),
+      campaign: resolveCampaign(detailQuery.data),
+    }
+  }, [detailQuery.data])
+
   const error = detailQuery.error ? normalizeHttpError(detailQuery.error) : null
 
   return (
@@ -98,6 +105,14 @@ export function SessionTracePage() {
                 <div>
                   <p className="text-muted">landing_path</p>
                   <p>{detailQuery.data.session.landingPath || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-muted">cliente_email</p>
+                  <p>{sessionContext.customerEmail}</p>
+                </div>
+                <div>
+                  <p className="text-muted">campana</p>
+                  <p>{sessionContext.campaign}</p>
                 </div>
               </CardContent>
             </Card>
@@ -284,6 +299,61 @@ function resolveFbtraceId(detail: SessionDetail | undefined) {
   const parsed = safeJsonParse(meta.responsePayload) as Record<string, unknown> | null
   const fbtraceId = parsed?.fbtrace_id
   return typeof fbtraceId === 'string' && fbtraceId.length > 0 ? fbtraceId : 'N/A'
+}
+
+function resolveCampaign(detail: SessionDetail | undefined) {
+  const campaign = detail?.session?.utmCampaign?.trim()
+  return campaign && campaign.length > 0 ? campaign : '(not set)'
+}
+
+function resolveCustomerEmail(detail: SessionDetail | undefined) {
+  if (!detail?.events?.length) {
+    return '(sin email)'
+  }
+
+  const purchaseEvents = detail.events
+    .filter((event) => event.eventType === 'purchase')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+  for (const event of purchaseEvents) {
+    const parsed = safeJsonParse(event.payloadJson)
+    const email =
+      readStringPath(parsed, ['data', 'object', 'customer_details', 'email']) ??
+      readStringPath(parsed, ['data', 'object', 'receipt_email']) ??
+      readStringPath(parsed, ['data', 'object', 'charges', 'data', 0, 'billing_details', 'email']) ??
+      readStringPath(parsed, ['data', 'object', 'metadata', 'customer_email'])
+
+    if (email) {
+      return email
+    }
+  }
+
+  return '(sin email)'
+}
+
+function readStringPath(value: unknown, path: Array<string | number>) {
+  let cursor: unknown = value
+  for (const key of path) {
+    if (typeof key === 'number') {
+      if (!Array.isArray(cursor) || key < 0 || key >= cursor.length) {
+        return null
+      }
+      cursor = cursor[key]
+      continue
+    }
+
+    if (cursor == null || typeof cursor !== 'object') {
+      return null
+    }
+    const record = cursor as Record<string, unknown>
+    cursor = record[key]
+  }
+
+  if (typeof cursor !== 'string') {
+    return null
+  }
+  const trimmed = cursor.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function KeyValue({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
