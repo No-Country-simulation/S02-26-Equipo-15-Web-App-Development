@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import './App.css';
-import { ensureEventId, readAttribution, rotateEventId } from './lib/attribution';
+import {
+  buildTrackPayloadAttribution,
+  ensureEventId,
+  readAttribution,
+  rotateEventId,
+} from './lib/attribution';
 import { trackBeginCheckout, trackCTA } from './lib/tracking/events';
 import { redirectToStripe } from './lib/stripe';
 import { apiFetch } from './config/api';
@@ -14,6 +19,7 @@ function App() {
     // Capture attribution on first paint and ensure event id exists.
     const attribution = readAttribution();
     setTrackingData(attribution);
+    const trackAttribution = buildTrackPayloadAttribution(attribution);
 
     const localEventId = rotateEventId();
     setEventId(localEventId);
@@ -21,13 +27,7 @@ function App() {
     const payload = {
       eventType: 'landing_view',
       eventId: localEventId,
-      utm_source: attribution?.utm_source,
-      utm_medium: attribution?.utm_medium,
-      utm_campaign: attribution?.utm_campaign,
-      utm_term: attribution?.utm_term,
-      utm_content: attribution?.utm_content,
-      gclid: attribution?.gclid,
-      fbclid: attribution?.fbclid,
+      ...trackAttribution,
       landing_path: window.location.pathname,
     };
 
