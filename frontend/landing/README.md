@@ -21,6 +21,11 @@ VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 VITE_META_PIXEL_ID=123456789012345
+VITE_ATTRIBUTION_DEFAULT_SOURCE=(direct)
+VITE_ATTRIBUTION_DEFAULT_MEDIUM=(none)
+VITE_ATTRIBUTION_DEFAULT_CAMPAIGN=(not set)
+VITE_ATTRIBUTION_REFERRAL_MEDIUM=referral
+VITE_ATTRIBUTION_REFERRAL_CAMPAIGN=(referral)
 ```
 
 ## Eventos que dispara
@@ -34,6 +39,14 @@ Notas:
 
 - `eventId` se envia a backend por `POST /api/track`.
 - En checkout se propaga a Stripe (`client_reference_id`) para correlacionar con webhook.
+- Si no llegan UTMs en la URL, la landing envia fallback en `POST /api/track`.
+- Los valores de fallback se configuran por `.env`:
+  - `VITE_ATTRIBUTION_DEFAULT_SOURCE`
+  - `VITE_ATTRIBUTION_DEFAULT_MEDIUM`
+  - `VITE_ATTRIBUTION_DEFAULT_CAMPAIGN`
+  - `VITE_ATTRIBUTION_REFERRAL_MEDIUM`
+  - `VITE_ATTRIBUTION_REFERRAL_CAMPAIGN`
+- Si existe referrer externo, clasifica `utm_source=<hostname_referrer>` y usa los valores referral del `.env`.
 
 ## Pruebas de pago (Stripe test mode)
 
