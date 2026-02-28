@@ -4,7 +4,7 @@ Landing de conversion que captura UTM, dispara eventos de funnel y conserva `eve
 
 ## Deploy
 
-- https://s02-26-equipo-15-web-app-developmen.vercel.app/
+- https://s02-26-equipo-15-web-app-developmen.vercel.app/?utm_source=google&utm_medium=cpc&utm_campaign=demo_q1&utm_term=tax&utm_content=ad_a&gclid=g4&fbclid=meta
 
 ## Variables de entorno
 

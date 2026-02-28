@@ -163,7 +163,7 @@ Auditoria de integraciones server-side.
 | Columna | Tipo | Nulo | Regla |
 |---|---|---|---|
 | `id` | `uuid` | No | PK |
-| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP`, `PIPEDRIVE` |
+| `integration` | `varchar(64)` | No | `META_CAPI`, `GA4_MP` |
 | `reference_id` | `varchar(255)` | Si | correlacion (`eventId` u otra clave) |
 | `status` | `varchar(32)` | No | `SENT`, `FAILED`, `SKIPPED`, `SENT_WITH_WARNINGS` |
 | `http_status` | `int` | Si | codigo HTTP |
@@ -255,23 +255,65 @@ LIMIT 50;
 WITH target AS (
   SELECT 'TU_EVENT_ID'::uuid AS event_id
 )
-SELECT 'session' AS section, ts.event_id::text AS ref, ts.created_at AS ts, NULL::text AS status
+SELECT
+  'tracking_session' AS section,
+  ts.event_id::text AS ref_1,
+  NULL::text AS ref_2,
+  NULL::text AS status,
+  ts.created_at AS ts,
+  NULL::text AS detail
 FROM tracking_session ts
 JOIN target t ON ts.event_id = t.event_id
 UNION ALL
-SELECT 'event', te.event_type, te.created_at, NULL::text
+SELECT
+  'tracking_event' AS section,
+  te.event_id::text AS ref_1,
+  te.event_type AS ref_2,
+  COALESCE(te.currency, '') AS status,
+  te.created_at AS ts,
+  COALESCE(te.value::text, '') AS detail
 FROM tracking_event te
 JOIN target t ON te.event_id = t.event_id
 UNION ALL
-SELECT 'order', COALESCE(o.payment_intent_id, o.stripe_session_id), o.created_at, o.business_status
+SELECT
+  'orders' AS section,
+  o.event_id::text AS ref_1,
+  COALESCE(o.payment_intent_id, o.stripe_session_id) AS ref_2,
+  COALESCE(o.business_status, o.status) AS status,
+  o.created_at AS ts,
+  'stripe_session=' || COALESCE(o.stripe_session_id, '') AS detail
 FROM orders o
 JOIN target t ON o.event_id = t.event_id
 UNION ALL
-SELECT 'integration', il.integration, il.created_at, il.status
+SELECT
+  'ga4_mp' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
 FROM integrations_log il
 JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'GA4_MP'
 UNION ALL
-SELECT 'webhook', swe.stripe_event_id, swe.received_at, swe.status
+SELECT
+  'meta_capi' AS section,
+  il.reference_id AS ref_1,
+  COALESCE(il.http_status::text, '') AS ref_2,
+  il.status AS status,
+  il.created_at AS ts,
+  COALESCE(il.error_message, '') AS detail
+FROM integrations_log il
+JOIN target t ON il.reference_id = t.event_id::text
+WHERE il.integration = 'META_CAPI'
+UNION ALL
+SELECT
+  'stripe_webhook_event' AS section,
+  swe.event_id::text AS ref_1,
+  swe.stripe_event_id AS ref_2,
+  swe.status AS status,
+  swe.received_at AS ts,
+  COALESCE(swe.error, '') AS detail
 FROM stripe_webhook_event swe
 JOIN target t ON swe.event_id = t.event_id
 ORDER BY ts DESC;

@@ -46,7 +46,6 @@
 - GA4 Measurement Protocol (server-side)
 - Meta Pixel (client-side)
 - Meta CAPI (server-side)
-- Pipedrive (feature flag)
 
 ## Infraestructura y deploy
 - Docker (backend)
