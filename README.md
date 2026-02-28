@@ -215,6 +215,11 @@ npm run dev
 ```bash
 VITE_API_URL=http://localhost:8080
 VITE_STRIPE_PAYMENT_LINK=https://buy.stripe.com/...
+VITE_ATTRIBUTION_DEFAULT_SOURCE=(direct)
+VITE_ATTRIBUTION_DEFAULT_MEDIUM=(none)
+VITE_ATTRIBUTION_DEFAULT_CAMPAIGN=(not set)
+VITE_ATTRIBUTION_REFERRAL_MEDIUM=referral
+VITE_ATTRIBUTION_REFERRAL_CAMPAIGN=(referral)
 ```
 
 ### 3. TrackSure Dashboard
@@ -302,7 +307,7 @@ Plan de tests para ampliar cobertura:
 
 ### A) Requisitos previos
 
-- Landing (Vercel): https://s02-26-equipo-15-web-app-developmen.vercel.app/
+- Landing (Vercel): https://s02-26-equipo-15-web-app-developmen.vercel.app/?utm_source=google&utm_medium=cpc&utm_campaign=demo_q1&utm_term=tax&utm_content=ad_a&gclid=g4&fbclid=meta
 - Admin (Vercel): https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login
 - API (Render): https://s02-26-equipo-15-web-app-development.onrender.com
 - Variables minimas (si corres local): `VITE_API_URL`, `ADMIN_USER`, `ADMIN_PASS`, `STRIPE_WEBHOOK_SECRET`. Stripe test mode: tarjeta `4242 4242 4242 4242` (fecha futura, CVC cualquiera).
@@ -406,7 +411,7 @@ _Timeline end-to-end con eventos, webhook e integraciones._
 
 ### F) Paso 5 - Validar `integrations_log` en la BDD (15-20s)
 
-`integrations_log` registra evidencia de envios server-side (GA4 MP, Meta CAPI y Pipedrive si aplica).  
+`integrations_log` registra evidencia de envios server-side (GA4 MP y Meta CAPI).  
 `status` esperado: `SENT`, `SENT_WITH_WARNINGS`, `SKIPPED` o `FAILED`.
 
 ![Integrations log correlacionada por eventId](./infra/demo/db-01-integrations-log.png)
@@ -415,7 +420,7 @@ _Validacion puntual de la integrations_log persistida y su relacion con  `refere
 ```sql
 -- Traza completa por event_id
 WITH target AS (
-  SELECT 'c5cdfb3f-67e0-4de4-bd26-8ae665b622ae'::uuid AS event_id
+  SELECT 'TU_EVENT_ID'::uuid AS event_id
 )
 SELECT
   'tracking_session' AS section,
@@ -496,7 +501,6 @@ _Validacion puntual de la orden persistida y su relacion con `event_id`._
 
 | Recurso | URL |
 |---|---|
-| Landing | https://s02-26-equipo-15-web-app-developmen.vercel.app/ |
+| Landing | https://s02-26-equipo-15-web-app-developmen.vercel.app/?utm_source=google&utm_medium=cpc&utm_campaign=demo_q1&utm_term=tax&utm_content=ad_a&gclid=g4&fbclid=meta|
 | TrackSure Dashboard | https://s02-26-equipo-15-web-app-admin.vercel.app/admin/login |
 | TrackSure API | https://s02-26-equipo-15-web-app-development.onrender.com |
-| Health API | https://s02-26-equipo-15-web-app-development.onrender.com/actuator/health |

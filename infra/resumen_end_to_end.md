@@ -118,9 +118,7 @@ SELECT
   NULL::text AS detail
 FROM tracking_session ts
 JOIN target t ON ts.event_id = t.event_id
-
 UNION ALL
-
 SELECT
   'tracking_event' AS section,
   te.event_id::text AS ref_1,
@@ -130,9 +128,7 @@ SELECT
   COALESCE(te.value::text, '') AS detail
 FROM tracking_event te
 JOIN target t ON te.event_id = t.event_id
-
 UNION ALL
-
 SELECT
   'orders' AS section,
   o.event_id::text AS ref_1,
@@ -142,9 +138,7 @@ SELECT
   'stripe_session=' || COALESCE(o.stripe_session_id, '') AS detail
 FROM orders o
 JOIN target t ON o.event_id = t.event_id
-
 UNION ALL
-
 SELECT
   'ga4_mp' AS section,
   il.reference_id AS ref_1,
@@ -155,9 +149,7 @@ SELECT
 FROM integrations_log il
 JOIN target t ON il.reference_id = t.event_id::text
 WHERE il.integration = 'GA4_MP'
-
 UNION ALL
-
 SELECT
   'meta_capi' AS section,
   il.reference_id AS ref_1,
@@ -168,9 +160,7 @@ SELECT
 FROM integrations_log il
 JOIN target t ON il.reference_id = t.event_id::text
 WHERE il.integration = 'META_CAPI'
-
 UNION ALL
-
 SELECT
   'stripe_webhook_event' AS section,
   swe.event_id::text AS ref_1,
@@ -180,7 +170,6 @@ SELECT
   COALESCE(swe.error, '') AS detail
 FROM stripe_webhook_event swe
 JOIN target t ON swe.event_id = t.event_id
-
 ORDER BY ts DESC;
 ```
 
