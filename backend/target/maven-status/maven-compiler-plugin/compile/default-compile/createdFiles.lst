@@ -1,4 +1,3 @@
-com\nocountry\mockapi\config\CorsConfig.class
+com\nocountry\mockapi\MockApiApplication.class
 com\nocountry\mockapi\dto\TrackRequest.class
 com\nocountry\mockapi\controller\TrackController.class
-com\nocountry\mockapi\MockApiApplication.class

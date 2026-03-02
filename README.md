@@ -4,6 +4,8 @@
 
 # TrackSure - Revenue Attribution & Server-Side Conversion Tracking
 
+[![TrackSure — End-to-End Revenue Attribution](https://img.youtube.com/vi/E2UbICAtl88/0.jpg)](https://www.youtube.com/watch?v=E2UbICAtl88)
+
 ## A) Resumen
 
 TrackSure es una plataforma de atribucion de ingresos orientada a decisiones reales de negocio.
@@ -496,6 +498,7 @@ Lectura rapida de esta captura (comportamiento esperado):
 
 ![Order correlacionada por eventId](./infra/demo/db-02-order-by-event-id.png)
 _Validacion puntual de la orden persistida y su relacion con `event_id`._
+
 
 ## URLs de referencia
 
